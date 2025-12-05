@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>Aldus Invasion - Final Port</title>
+    <style>
+        body {
+            background-color: #050505;
+            color: #ccc;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            background-color: #000;
+            image-rendering: pixelated;
+            box-shadow: 0 0 30px #222;
+            border: 2px solid #444;
+            /* Scaliamo la risoluzione originale 320x200 a 960x600 */
+            width: 960px;
+            height: 600px;
+        }
+        #ui { margin-top: 10px; }
+        button {
+            background: #AA0000; color: #FFF; border: 2px solid #FFF;
+            padding: 10px 20px; font-family: inherit; font-size: 16px; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas" width="320" height="200"></canvas>
+    <div id="ui">
+        <button id="btnStart">START GAME</button>
+    </div>
+
+<script>
+/**
+ * ALDUS INVASION - FULL JS PORT
+ * Ricostruzione fedele basata sui DATA statements originali di ALDINV-1.BAS
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const btnStart = document.getElementById('btnStart');
+
+// --- 1. PALETTE QBASIC (EGA/VGA) ---
+const PAL = [
+    '#000000', '#0000AA', '#00AA00', '#00AAAA', '#AA0000', '#AA00AA', '#AA5500', '#AAAAAA',
+    '#555555', '#5555FF', '#55FF55', '#55FFFF', '#FF5555', '#FF55FF', '#FFFF55', '#FFFFFF'
+];
+
+// --- 2. ASSETS GRAFICI (Estratti dai DATA) ---
+// Ogni array contiene due frame di animazione (Open/Close)
+const SPRITES_SRC = {
+    // [cite: 423] Player
+    player: [[
+        "        4          ",
+        "       414         ",
+        "       414         ",
+        "      41314        ",
+        "     4137314       ",
+        "    413337314      ",
+        "    413337314      ",
+        "    411333114      ",
+        "    411111114      ",
+        "    441111144      ",
+        "    244424442      ",
+        "    211121112      ",
+        "   22111211122     ",
+        "   22111211122     ",
+        "   22111211122     ",
+        "  2225552555222    ",
+        "  2222  2  2222    "
+    ]],
+    // [cite: 450] Mostro 1 (Riga 1 - Alto)
+    m1: [
+        [ "  55  22222  55  ", "    522222225    ", "  2222228222222  ", "  2227072227072  ", "  2222228222222  ", "  2232328232322  ", "    333363333    ", "     3336 333    ", "   333  6  333   ", " 333      333    " ],
+        [ " 5   222 222   5 ", "  5552222222555  ", "  2222228222222  ", "  2707222707222  ", "  2222228222222  ", "   23238383232   ", "    333343333    ", "    333 4333     ", "   333     333   ", "    333      333 " ]
+    ],
+    // [cite: 452] Mostro 2
+    m2: [
+        [ "        666      ", "      6633366    ", "  55663E333E36655", "  55663E333E36655", "     663333366   ", "     663333366   ", "      3631363    ", "    66  66  66   ", "   66  66  66    ", "  66  66  66     " ],
+        [ "      666        ", "     6633366      ", "55663E333E36655  ", "55663E333E36655  ", "   663333366     ", "   663333366     ", "    3631363      ", "   66  66  66    ", "    66  66  66   ", "     66  66  66  " ]
+    ],
+    // [cite: 454] Mostro 3
+    m3: [
+        [ "  66         66  ", "    6 35553 6    ", "    355555553    ", "  3577555577553  ", " 355555555555553 ", " 355555333555553 ", "  3555555555553  ", "    5   5   5    ", "   5    5    5   ", "    55     55    " ],
+        [ "        6        ", "   66 35553 66   ", "  6 355555553 6  ", "  3557755557753  ", " 355555535555553 ", " 355555333555553 ", "  3555553555553  ", "   55   5   55   ", "  5     5     5  ", " 55    5 5    55 " ]
+    ],
+    // [cite: 456] Mostro 4
+    m4: [
+        [ "       555 555   ", " 77   57775      ", "  7 177777771    ", "  777E477E47777  ", "    177777771 7  ", "    177444771 77 ", "      77777      ", "     77   77     ", "    77     77    ", " 7777     7777   " ],
+        [ "   555 555       ", "      57775   77 ", "    377777773 7  ", "  77774E774E777  ", "  7 377777773    ", " 77 377747773    ", "      77777      ", "     77   77     ", "    77     77    ", "   7777     7777 " ]
+    ],
+    // [cite: 458] Mostro 5 (Basso)
+    m5: [
+        [ " 64           46 ", "   44411111444   ", "    111111111    ", "   17331733111   ", "   11111111111   ", "  1111111111111  ", "  11111EEE11111  ", "   11111111111   ", "   11     11     ", "   1111   1111   " ],
+        [ "                 ", "     4111114     ", "   44111111144   ", "  6 113371337 6  ", "  1111111111111  ", " 111111111111111 ", " 111111E1E111111 ", "  111111E111111  ", "    11     11    ", "   1111   1111   " ]
+    ],
+    // [cite: 460] UFO
+    ufo: [[
+        "           6666           ",
+        "          600006          ",
+        "      6E66666666666E6     ",
+        "  6666633666666666336666  ",
+        " 644443333444444433334446 ",
+        "  6666633666666666336666  ",
+        "   66666666466466666666   ",
+        "          468864          "
+    ]],
+    // [cite: 475] Sparo
+    shot: [[ " D ", "D4D", " 4 ", "333" ]],
+    // [cite: 423] Esplosione Player
+    bum: [[
+        "   E  413B4        ",
+        " 4  EE137EB4E E    ",
+        "  4 4E3E3DEB4E     ",
+        "  4 4BE3EDDEE 4  4 ",
+        "  E EEEEEEE14  E   ",
+        "   E4BFEEEEE4 44   "
+    ]]
+};
+
+// Generatore Sprite
+const sprites = {};
+function parseSprites() {
+    for(let k in SPRITES_SRC) {
+        sprites[k] = SPRITES_SRC[k].map(frame => {
+            const h = frame.length;
+            const w = frame[0].length;
+            const c = document.createElement('canvas');
+            c.width = w; c.height = h;
+            const cx = c.getContext('2d');
+            const id = cx.createImageData(w, h);
+            for(let y=0; y<h; y++) {
+                for(let x=0; x<w; x++) {
+                    const ch = frame[y][x];
+                    if(ch !== ' ') {
+                        const col = PAL[parseInt(ch, 16)];
+                        const idx = (y*w+x)*4;
+                        const r = parseInt(col.slice(1,3),16), g=parseInt(col.slice(3,5),16), b=parseInt(col.slice(5,7),16);
+                        id.data[idx]=r; id.data[idx+1]=g; id.data[idx+2]=b; id.data[idx+3]=255;
+                    }
+                }
+            }
+            cx.putImageData(id, 0, 0);
+            return c;
+        });
+    }
+}
+parseSprites();
+
+// --- 3. AUDIO SYSTEM ---
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let actx;
+function sfx(freq, type='square', len=0.1) {
+    if(!actx) return;
+    const o = actx.createOscillator();
+    const g = actx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.1, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + len);
+    o.connect(g); g.connect(actx.destination);
+    o.start(); o.stop(actx.currentTime + len);
+}
+
+// --- 4. GAME ENGINE ---
+const GAME = {
+    state: 'MENU', // MENU, PLAY, JOKE, OVER
+    width: 320, height: 200,
+    level: 1, score: 0, lives: 3,
+    keys: {},
+    player: { x: 150, y: 175, dead: false },
+    bullets: [],
+    enemies: [],
+    ufo: { active: false, x: 0, dir: 0, timer: 0 },
+    joke: { timer: 0, phase: 0 },
+    enemyDir: 1,
+    moveTimer: 0,
+    animFrame: 0
+};
+
+window.onkeydown = e => {
+    if(e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
+    GAME.keys[e.code] = true;
+};
+window.onkeyup = e => GAME.keys[e.code] = false;
+
+function initLevel() {
+    GAME.enemies = [];
+    GAME.bullets = [];
+    GAME.player.x = 150;
+    GAME.enemyDir = 1;
+    GAME.ufo.active = false;
+    
+    // Creazione griglia mostri (5 righe diverse)
+    // [cite: 346-347] Loop originale per piazzare i mostri
+    const types = ['m1', 'm2', 'm3', 'm4', 'm5'];
+    for(let r=0; r<5; r++) {
+        for(let c=0; c<10; c++) { // [cite: 13] QBasic usa 10 colonne (0 TO 9)
+            GAME.enemies.push({
+                type: types[r],
+                x: 25 + (c * 24),
+                y: 30 + (r * 15),
+                active: true,
+                row: r
+            });
+        }
+    }
+}
+
+function update() {
+    if(GAME.state === 'PLAY') updatePlay();
+    if(GAME.state === 'JOKE') updateJoke();
+}
+
+function updatePlay() {
+    // Player
+    if(GAME.keys['ArrowLeft'] && GAME.player.x > 2) GAME.player.x -= 2;
+    if(GAME.keys['ArrowRight'] && GAME.player.x < 300) GAME.player.x += 2;
+    
+    // Shoot
+    if(GAME.keys['Space'] && GAME.bullets.length === 0) {
+        GAME.bullets.push({ x: GAME.player.x+8, y: GAME.player.y, active: true });
+        sfx(800, 'square', 0.05);
+        GAME.keys['Space'] = false; 
+    }
+
+    // Bullets
+    for(let b of GAME.bullets) {
+        b.y -= 5;
+        if(b.y < 0) b.active = false;
+        
+        // Hit UFO [cite: 383]
+        if(GAME.ufo.active && rectCol(b.x, b.y, 2, 4, GAME.ufo.x, 15, 24, 8)) {
+            GAME.ufo.active = false;
+            b.active = false;
+            GAME.score += Math.floor(Math.random()*3)*50 + 50; // [cite: 390] Punti variabili
+            sfx(1200, 'sawtooth', 0.2);
+        }
+
+        // Hit Enemy
+        for(let e of GAME.enemies) {
+            if(e.active && rectCol(b.x, b.y, 2, 4, e.x, e.y, 16, 10)) {
+                e.active = false;
+                b.active = false;
+                GAME.score += (5 - e.row) * 10;
+                sfx(200, 'noise', 0.1);
+                // Velocizza il gioco man mano che muoiono
+                break;
+            }
+        }
+    }
+    GAME.bullets = GAME.bullets.filter(b => b.active);
+
+    // Enemies Move (A scatti)
+    GAME.moveTimer++;
+    // [cite: 9] La velocità dipende dal livello e dal numero di mostri (QMM)
+    let speed = Math.max(5, 40 - (GAME.level*5) - (50 - GAME.enemies.filter(e=>e.active).length)/2);
+    
+    if(GAME.moveTimer > speed) {
+        GAME.moveTimer = 0;
+        GAME.animFrame = 1 - GAME.animFrame;
+        sfx(60, 'square', 0.03); // [cite: 28] Suono ritmico
+        
+        let drop = false;
+        for(let e of GAME.enemies) {
+            if(!e.active) continue;
+            if((GAME.enemyDir === 1 && e.x > 300) || (GAME.enemyDir === -1 && e.x < 5)) drop = true;
+        }
+        
+        if(drop) {
+            GAME.enemyDir *= -1;
+            GAME.enemies.forEach(e => e.y += 10);
+        } else {
+            GAME.enemies.forEach(e => e.x += (4 * GAME.enemyDir));
+        }
+
+        // Invasion Check
+        if(GAME.enemies.some(e => e.active && e.y > 170)) {
+            GAME.state = 'OVER';
+        }
+    }
+
+    // UFO Logic [cite: 403]
+    if(!GAME.ufo.active) {
+        if(Math.random() < 0.002) { // Raro
+            GAME.ufo.active = true;
+            GAME.ufo.dir = (Math.random() > 0.5) ? 2 : -2;
+            GAME.ufo.x = (GAME.ufo.dir > 0) ? 0 : 300;
+        }
+    } else {
+        GAME.ufo.x += GAME.ufo.dir;
+        GAME.ufo.timer++;
+        if(GAME.ufo.timer%10===0) sfx(1500, 'sine', 0.05); // Suono UFO
+        if(GAME.ufo.x < -20 || GAME.ufo.x > 340) GAME.ufo.active = false;
+    }
+
+    // Level Clear
+    if(!GAME.enemies.some(e => e.active)) {
+        startJoke();
+    }
+}
+
+// --- INTERMEZZO (JOKE) ---
+//  Implementazione semplificata della logica Joke1
+function startJoke() {
+    GAME.state = 'JOKE';
+    GAME.joke.timer = 0;
+    GAME.joke.ufoX = 320;
+    GAME.joke.monX = 350;
+}
+
+function updateJoke() {
+    GAME.joke.timer++;
+    
+    // Ufo scappa, mostro insegue
+    GAME.joke.ufoX -= 2;
+    GAME.joke.monX -= 2.1;
+
+    if(GAME.joke.timer % 15 === 0) {
+        sfx(600 + (GAME.joke.timer%2)*200, 'square', 0.05); // Musica buffa
+    }
+
+    if(GAME.joke.monX < -50) {
+        GAME.level++;
+        initLevel();
+        GAME.state = 'PLAY';
+    }
+}
+
+function rectCol(x1,y1,w1,h1, x2,y2,w2,h2) {
+    return x1 < x2+w2 && x1+w1 > x2 && y1 < y2+h2 && y1+h1 > y2;
+}
+
+// --- RENDER ---
+function draw() {
+    ctx.fillStyle = PAL[0];
+    ctx.fillRect(0, 0, GAME.width, GAME.height);
+
+    if(GAME.state === 'MENU') {
+        text("ALDUS INVASION", 100, 80, 14);
+        text("ORIGINAL BY ALDO PRINZI", 80, 100, 7);
+        text("PRESS START", 120, 140, 15);
+        return;
+    }
+
+    if(GAME.state === 'JOKE') {
+        text("LEVEL " + GAME.level + " COMPLETED!", 100, 50, 14);
+        // Disegna UFO e Mostro che corrono
+        ctx.drawImage(sprites.ufo[0], GAME.joke.ufoX, 100);
+        let mf = Math.floor(GAME.joke.timer / 10) % 2;
+        ctx.drawImage(sprites.m2[mf], GAME.joke.monX, 100);
+        return;
+    }
+
+    if(GAME.state === 'OVER') {
+        text("GAME OVER", 120, 90, 4);
+        text("SCORE: " + GAME.score, 120, 110, 7);
+        return;
+    }
+
+    // Draw Enemies
+    for(let e of GAME.enemies) {
+        if(e.active) {
+            ctx.drawImage(sprites[e.type][GAME.animFrame], e.x, e.y);
+        }
+    }
+
+    // UFO
+    if(GAME.ufo.active) ctx.drawImage(sprites.ufo[0], GAME.ufo.x, 15);
+
+    // Player
+    ctx.drawImage(sprites.player[0], GAME.player.x, GAME.player.y);
+
+    // Bullets
+    ctx.fillStyle = PAL[15];
+    for(let b of GAME.bullets) ctx.fillRect(b.x, b.y, 2, 5);
+
+    // HUD
+    ctx.fillStyle = PAL[2]; // Linea verde
+    ctx.fillRect(0, 195, 320, 2);
+    text("SCORE:" + GAME.score, 5, 10, 15);
+    text("LEVEL:" + GAME.level, 260, 10, 14);
+}
+
+function text(str, x, y, colIdx) {
+    ctx.fillStyle = PAL[colIdx];
+    ctx.font = "10px monospace";
+    ctx.fillText(str, x, y);
+}
+
+// Loop
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+btnStart.onclick = () => {
+    actx = new AudioContext();
+    GAME.state = 'PLAY';
+    initLevel();
+    btnStart.style.display = 'none';
+    loop();
+};
+
+// Primo frame
+draw();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aldus Invasion - JavaScript Version</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #ff0;
+            margin-bottom: 10px;
+            font-size: 2.5rem;
+            text-shadow: 0 0 10px #ff0;
+        }
+        
+        .subtitle {
+            color: #0ff;
+            margin-bottom: 20px;
+            font-size: 1.2rem;
+        }
+        
+        .game-container {
+            position: relative;
+            margin: 0 auto 20px;
+            border: 3px solid #444;
+            background-color: #000;
+            overflow: hidden;
+        }
+        
+        #gameCanvas {
+            display: block;
+            background-color: #000;
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 800px;
+        }
+        
+        .info-panel {
+            background-color: #111;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            min-width: 200px;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .info-label {
+            color: #0ff;
+        }
+        
+        .info-value {
+            color: #ff0;
+            font-weight: bold;
+        }
+        
+        .instructions {
+            background-color: #111;
+            padding: 15px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            max-width: 800px;
+            margin-top: 20px;
+            text-align: left;
+        }
+        
+        .instructions h3 {
+            color: #ff0;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .instructions ul {
+            padding-left: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .instructions li {
+            margin-bottom: 8px;
+        }
+        
+        .instructions .key {
+            display: inline-block;
+            background-color: #333;
+            padding: 2px 8px;
+            border-radius: 3px;
+            margin: 0 3px;
+            border: 1px solid #666;
+        }
+        
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+        
+        button {
+            background-color: #333;
+            color: white;
+            border: 1px solid #666;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background-color: #444;
+            border-color: #0ff;
+        }
+        
+        button:active {
+            background-color: #222;
+        }
+        
+        .footer {
+            margin-top: 20px;
+            color: #888;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+        
+        .credits {
+            color: #0ff;
+            margin-top: 5px;
+        }
+        
+        .joke-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            font-size: 1.5rem;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .game-over {
+            color: #f00;
+            font-size: 3rem;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #f00;
+        }
+        
+        .level-complete {
+            color: #0f0;
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #0f0;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ALDUS INVASION</h1>
+        <div class="subtitle">JavaScript Version - Original by Aldo Prinzi (1994)</div>
+        
+        <div class="controls">
+            <div class="info-panel">
+                <div class="info-item">
+                    <span class="info-label">PUNTEGGIO:</span>
+                    <span id="score" class="info-value">0</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">LIVELLO:</span>
+                    <span id="level" class="info-value">1</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">VITE:</span>
+                    <span id="lives" class="info-value">3</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">ALIENI:</span>
+                    <span id="aliens" class="info-value">50</span>
+                </div>
+            </div>
+            
+            <div class="info-panel">
+                <div class="info-item">
+                    <span class="info-label">SUONO:</span>
+                    <span id="sound-status" class="info-value">ON</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">VELOCITÀ:</span>
+                    <span id="speed" class="info-value">NORMALE</span>
+                </div>
+                <div class="buttons">
+                    <button id="pauseBtn">PAUSA (P)</button>
+                    <button id="soundBtn">SUONO (S)</button>
+                    <button id="speedBtn">VELOCITÀ (R)</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="game-container">
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            
+            <!-- Schermate speciali -->
+            <div id="jokeScreen1" class="joke-screen hidden">
+                <div class="level-complete">LIVELLO 1 COMPLETATO!</div>
+                <div style="color: #ff0; margin-bottom: 20px;">Intermezzo comico...</div>
+                <div style="color: #0ff; max-width: 600px; margin-bottom: 30px;">
+                    Gli alieni si stanno organizzando per un controattacco!
+                    Guarda come si preparano al livello successivo...
+                </div>
+                <button id="continueBtn1">CONTINUA</button>
+            </div>
+            
+            <div id="jokeScreen2" class="joke-screen hidden">
+                <div class="level-complete">LIVELLO 2 COMPLETATO!</div>
+                <div style="color: #ff0; margin-bottom: 20px;">Secondo intermezzo...</div>
+                <div style="color: #0ff; max-width: 600px; margin-bottom: 30px;">
+                    Un UFO speciale è apparso! Attenzione ai suoi movimenti improvvisi
+                    e ai suoi attacchi insidiosi...
+                </div>
+                <button id="continueBtn2">CONTINUA</button>
+            </div>
+            
+            <div id="jokeScreen3" class="joke-screen hidden">
+                <div class="level-complete">LIVELLO 3 COMPLETATO!</div>
+                <div style="color: #ff0; margin-bottom: 20px;">Terzo intermezzo...</div>
+                <div style="color: #0ff; max-width: 600px; margin-bottom: 30px;">
+                    La battaglia si intensifica! Gli alieni stanno chiamando rinforzi
+                    da altre galassie. Preparati per l'assalto finale!
+                </div>
+                <button id="continueBtn3">CONTINUA</button>
+            </div>
+            
+            <div id="gameOverScreen" class="joke-screen hidden">
+                <div class="game-over">GAME OVER!</div>
+                <div style="color: #ff0; margin-bottom: 20px; font-size: 1.8rem;">Punteggio finale: <span id="finalScore">0</span></div>
+                <div style="color: #0ff; max-width: 600px; margin-bottom: 30px;">
+                    La Terra è stata invasa dagli alieni! 
+                    Ma puoi riprovare e battere il tuo record.
+                </div>
+                <button id="restartBtn">NUOVA PARTITA</button>
+            </div>
+            
+            <div id="startScreen" class="joke-screen">
+                <div class="level-complete">ALDUS INVASION</div>
+                <div style="color: #ff0; margin-bottom: 20px; font-size: 1.8rem;">JavaScript Version</div>
+                <div style="color: #0ff; max-width: 600px; margin-bottom: 30px;">
+                    Difendi la Terra dall'invasione aliena!<br>
+                    Distruggi tutti gli alieni per passare al livello successivo.
+                </div>
+                <div style="color: #f0f; margin-bottom: 30px; font-size: 1.2rem;">
+                    FREEWARE GAME Written by ALDO PRINZI (1994)<br>
+                    Adattato in JavaScript per il web
+                </div>
+                <button id="startBtn">INIZIA IL GIOCO</button>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>CONTROLLI</h3>
+            <ul>
+                <li>Muovi l'astronave: <span class="key">←</span> <span class="key">→</span> (Frecce sinistra/destra)</li>
+                <li>Spara: <span class="key">SPAZIO</span> o <span class="key">↑</span> (Freccia su)</li>
+                <li>Pausa: <span class="key">P</span></li>
+                <li>Attiva/disattiva suono: <span class="key">S</span></li>
+                <li>Cambia velocità: <span class="key">R</span></li>
+                <li>Esci dal gioco: <span class="key">ESC</span></li>
+            </ul>
+            <div style="text-align: center; color: #ff0;">
+                Distruggi gli UFO per punti bonus! Ogni livello aumenta la difficoltà.
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div>Gioco originale creato da Aldo Prinzi nel 1994 per MS/QBasic</div>
+            <div class="credits">Adattato in JavaScript - 2023</div>
+        </div>
+    </div>
+
+    <script>
+        // Variabili globali del gioco
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Dimensioni del campo di gioco (scalate rispetto all'originale 320x200)
+        const GAME_WIDTH = 800;
+        const GAME_HEIGHT = 600;
+        
+        // Stato del gioco
+        let gameState = {
+            score: 0,
+            level: 1,
+            lives: 3,
+            aliensRemaining: 50,
+            gameActive: false,
+            paused: false,
+            soundOn: true,
+            speed: 1, // 1 = normale, 2 = veloce
+            player: {
+                x: GAME_WIDTH / 2 - 25,
+                y: GAME_HEIGHT - 80,
+                width: 50,
+                height: 40,
+                speed: 8,
+                canShoot: true,
+                shotCooldown: 0
+            },
+            aliens: [],
+            alienRows: 5,
+            alienCols: 10,
+            alienWidth: 40,
+            alienHeight: 30,
+            alienSpeed: 1,
+            alienDirection: 1, // 1 = destra, -1 = sinistra
+            alienMoveCounter: 0,
+            alienMoveThreshold: 30,
+            alienShootChance: 0.005,
+            shots: [],
+            alienShots: [],
+            ufo: null,
+            ufoSpawnChance: 0.001,
+            explosions: [],
+            keys: {},
+            lastTime: 0,
+            gameTime: 0
+        };
+        
+        // Suoni del gioco
+        const sounds = {
+            shoot: new Audio(),
+            explosion: new Audio(),
+            alienHit: new Audio(),
+            playerHit: new Audio(),
+            ufoSpawn: new Audio(),
+            ufoHit: new Audio(),
+            levelUp: new Audio()
+        };
+        
+        // Inizializza i suoni (usiamo toni generati al momento)
+        function initSounds() {
+            // Creiamo suoni usando l'API Web Audio
+            try {
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                // Suono dello sparo del player
+                sounds.shoot.play = function() {
+                    if (!gameState.soundOn) return;
+                    
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.value = 800;
+                    oscillator.type = 'square';
+                    
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.1);
+                };
+                
+                // Suono esplosione
+                sounds.explosion.play = function() {
+                    if (!gameState.soundOn) return;
+                    
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.setValueAtTime(100, audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.5);
+                    oscillator.type = 'sawtooth';
+                    
+                    gainNode.gain.setValueAtTime(0.5, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.5);
+                };
+                
+                // Suono colpo alieno
+                sounds.alienHit.play = function() {
+                    if (!gameState.soundOn) return;
+                    
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.value = 200;
+                    oscillator.type = 'sine';
+                    
+                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.2);
+                };
+                
+                // Suono colpo player
+                sounds.playerHit.play = function() {
+                    if (!gameState.soundOn) return;
+                    
+                    for (let i = 0; i < 3; i++) {
+                        setTimeout(() => {
+                            const oscillator = audioContext.createOscillator();
+                            const gainNode = audioContext.createGain();
+                            
+                            oscillator.connect(gainNode);
+                            gainNode.connect(audioContext.destination);
+                            
+                            oscillator.frequency.value = 100 + i * 50;
+                            oscillator.type = 'square';
+                            
+                            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+                            
+                            oscillator.start(audioContext.currentTime);
+                            oscillator.stop(audioContext.currentTime + 0.1);
+                        }, i * 100);
+                    }
+                };
+                
+                // Suono UFO che appare
+                sounds.ufoSpawn.play = function() {
+                    if (!gameState.soundOn) return;
+                    
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    oscillator.frequency.setValueAtTime(1500, audioContext.currentTime);
+                    oscillator.frequency.exponentialRampToValueAtTime(500, audioContext.currentTime + 0.3);
+                    oscillator.type = 'sine';
+                    
+                    gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 0.3);
+                };
+                
+                // Suono colpo UFO
+                sounds.ufoHit.play = function() {
+                    if (!gameState.soundOn) return;
+                    
+                    for (let i = 0; i < 5; i++) {
+                        setTimeout(() => {
+                            const oscillator = audioContext.createOscillator();
+                            const gainNode = audioContext.createGain();
+                            
+                            oscillator.connect(gainNode);
+                            gainNode.connect(audioContext.destination);
+                            
+                            oscillator.frequency.value = 60 + i * 100;
+                            oscillator.type = 'sawtooth';
+                            
+                            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                            
+                            oscillator.start(audioContext.currentTime);
+                            oscillator.stop(audioContext.currentTime + 0.2);
+                        }, i * 50);
+                    }
+                };
+                
+                // Suono livello completato
+                sounds.levelUp.play = function() {
+                    if (!gameState.soundOn) return;
+                    
+                    // Sequenza di toni ascendenti
+                    const notes = [262, 330, 392, 523, 659]; // Do, Mi, Sol, Do, Mi
+                    
+                    notes.forEach((freq, index) => {
+                        setTimeout(() => {
+                            const oscillator = audioContext.createOscillator();
+                            const gainNode = audioContext.createGain();
+                            
+                            oscillator.connect(gainNode);
+                            gainNode.connect(audioContext.destination);
+                            
+                            oscillator.frequency.value = freq;
+                            oscillator.type = 'sine';
+                            
+                            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+                            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+                            
+                            oscillator.start(audioContext.currentTime);
+                            oscillator.stop(audioContext.currentTime + 0.2);
+                        }, index * 150);
+                    });
+                };
+                
+            } catch (e) {
+                console.log("Audio non supportato o disabilitato");
+                // Disabilita tutti i suoni se l'API Audio non è supportata
+                Object.keys(sounds).forEach(key => {
+                    sounds[key].play = function() {};
+                });
+            }
+        }
+        
+        // Inizializza il gioco
+        function initGame() {
+            // Inizializza i suoni
+            initSounds();
+            
+            // Crea gli alieni
+            createAliens();
+            
+            // Aggiorna la UI
+            updateUI();
+            
+            // Avvia il game loop
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Crea la griglia di alieni
+        function createAliens() {
+            gameState.aliens = [];
+            const startX = 100;
+            const startY = 80;
+            const spacingX = 60;
+            const spacingY = 50;
+            
+            for (let row = 0; row < gameState.alienRows; row++) {
+                for (let col = 0; col < gameState.alienCols; col++) {
+                    // 5 tipi di alieni (come nell'originale)
+                    let type;
+                    if (row === 0) type = 4; // Alieno rosso (più punti)
+                    else if (row <= 2) type = 3; // Alieno viola
+                    else type = 2; // Alieno verde
+                    
+                    gameState.aliens.push({
+                        x: startX + col * spacingX,
+                        y: startY + row * spacingY,
+                        width: gameState.alienWidth,
+                        height: gameState.alienHeight,
+                        type: type,
+                        alive: true,
+                        frame: 0 // Per l'animazione
+                    });
+                }
+            }
+            
+            gameState.aliensRemaining = gameState.aliens.length;
+        }
+        
+        // Disegna il gioco
+        function draw() {
+            // Sfondo nero
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+            
+            // Linea di base
+            ctx.fillStyle = '#444';
+            ctx.fillRect(0, GAME_HEIGHT - 30, GAME_WIDTH, 5);
+            
+            // Disegna il player
+            drawPlayer();
+            
+            // Disegna gli alieni
+            drawAliens();
+            
+            // Disegna i colpi
+            drawShots();
+            
+            // Disegna gli UFO
+            if (gameState.ufo) {
+                drawUFO();
+            }
+            
+            // Disegna le esplosioni
+            drawExplosions();
+            
+            // Disegna la barra informativa
+            drawHUD();
+        }
+        
+        // Disegna il player
+        function drawPlayer() {
+            ctx.save();
+            
+            // Corpo dell'astronave
+            ctx.fillStyle = '#0af';
+            ctx.beginPath();
+            ctx.moveTo(gameState.player.x + gameState.player.width / 2, gameState.player.y);
+            ctx.lineTo(gameState.player.x + gameState.player.width, gameState.player.y + gameState.player.height);
+            ctx.lineTo(gameState.player.x, gameState.player.y + gameState.player.height);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Cabina
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(
+                gameState.player.x + gameState.player.width / 2 - 5, 
+                gameState.player.y + 10, 
+                10, 
+                15
+            );
+            
+            // Motori
+            ctx.fillStyle = '#f00';
+            const engineWidth = 8;
+            const engineSpacing = 12;
+            ctx.fillRect(
+                gameState.player.x + gameState.player.width / 2 - engineSpacing - engineWidth / 2,
+                gameState.player.y + gameState.player.height - 10,
+                engineWidth,
+                10
+            );
+            ctx.fillRect(
+                gameState.player.x + gameState.player.width / 2 - engineWidth / 2,
+                gameState.player.y + gameState.player.height - 10,
+                engineWidth,
+                10
+            );
+            ctx.fillRect(
+                gameState.player.x + gameState.player.width / 2 + engineSpacing - engineWidth / 2,
+                gameState.player.y + gameState.player.height - 10,
+                engineWidth,
+                10
+            );
+            
+            // Fiamme dei motori (animazione)
+            const flameHeight = 10 + Math.sin(gameState.gameTime * 0.1) * 5;
+            ctx.fillStyle = '#ff0';
+            ctx.fillRect(
+                gameState.player.x + gameState.player.width / 2 - engineSpacing - engineWidth / 2,
+                gameState.player.y + gameState.player.height,
+                engineWidth,
+                flameHeight
+            );
+            ctx.fillStyle = '#f90';
+            ctx.fillRect(
+                gameState.player.x + gameState.player.width / 2 - engineWidth / 2,
+                gameState.player.y + gameState.playerHeight,
+                engineWidth,
+                flameHeight
+            );
+            ctx.fillStyle = '#ff0';
+            ctx.fillRect(
+                gameState.player.x + gameState.player.width / 2 + engineSpacing - engineWidth / 2,
+                gameState.player.y + gameState.playerHeight,
+                engineWidth,
+                flameHeight
+            );
+            
+            ctx.restore();
+        }
+        
+        // Disegna gli alieni
+        function drawAliens() {
+            gameState.aliens.forEach(alien => {
+                if (!alien.alive) return;
+                
+                // Colore in base al tipo
+                let color;
+                switch(alien.type) {
+                    case 4: color = '#f00'; break; // Rosso
+                    case 3: color = '#f0f'; break; // Viola
+                    default: color = '#0f0'; break; // Verde
+                }
+                
+                // Animazione (alterna tra due frame)
+                const frameOffset = alien.frame === 0 ? 0 : 5;
+                
+                ctx.save();
+                ctx.fillStyle = color;
+                
+                // Corpo dell'alieno
+                ctx.beginPath();
+                ctx.ellipse(
+                    alien.x + alien.width / 2,
+                    alien.y + alien.height / 2,
+                    alien.width / 2 - 5,
+                    alien.height / 2 - 5,
+                    0, 0, Math.PI * 2
+                );
+                ctx.fill();
+                
+                // Occhi
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(
+                    alien.x + alien.width / 2 - 8 + frameOffset,
+                    alien.y + alien.height / 2 - 5,
+                    4, 0, Math.PI * 2
+                );
+                ctx.arc(
+                    alien.x + alien.width / 2 + 8 - frameOffset,
+                    alien.y + alien.height / 2 - 5,
+                    4, 0, Math.PI * 2
+                );
+                ctx.fill();
+                
+                // Pupille
+                ctx.fillStyle = '#00f';
+                ctx.beginPath();
+                ctx.arc(
+                    alien.x + alien.width / 2 - 8 + frameOffset,
+                    alien.y + alien.height / 2 - 5,
+                    2, 0, Math.PI * 2
+                );
+                ctx.arc(
+                    alien.x + alien.width / 2 + 8 - frameOffset,
+                    alien.y + alien.height / 2 - 5,
+                    2, 0, Math.PI * 2
+                );
+                ctx.fill();
+                
+                // Bocca
+                ctx.fillStyle = '#f00';
+                ctx.fillRect(
+                    alien.x + alien.width / 2 - 10,
+                    alien.y + alien.height / 2 + 5,
+                    20, 3
+                );
+                
+                ctx.restore();
+            });
+        }
+        
+        // Disegna i colpi
+        function drawShots() {
+            // Colpi del player
+            ctx.fillStyle = '#0ff';
+            gameState.shots.forEach(shot => {
+                ctx.fillRect(shot.x - 2, shot.y, 4, 15);
+            });
+            
+            // Colpi degli alieni
+            ctx.fillStyle = '#f00';
+            gameState.alienShots.forEach(shot => {
+                ctx.fillRect(shot.x - 2, shot.y, 4, 10);
+            });
+        }
+        
+        // Disegna gli UFO
+        function drawUFO() {
+            const ufo = gameState.ufo;
+            ctx.save();
+            
+            // Corpo dell'UFO
+            ctx.fillStyle = '#0f0';
+            ctx.beginPath();
+            ctx.ellipse(
+                ufo.x + ufo.width / 2,
+                ufo.y + ufo.height / 2,
+                ufo.width / 2,
+                ufo.height / 3,
+                0, 0, Math.PI * 2
+            );
+            ctx.fill();
+            
+            // Cupola
+            ctx.fillStyle = '#88f';
+            ctx.beginPath();
+            ctx.arc(
+                ufo.x + ufo.width / 2,
+                ufo.y + ufo.height / 2 - 5,
+                ufo.width / 3,
+                0, Math.PI
+            );
+            ctx.fill();
+            
+            // Luci (animazione)
+            const lightColors = ['#f00', '#0f0', '#00f', '#ff0'];
+            const lightIndex = Math.floor(gameState.gameTime * 0.1) % lightColors.length;
+            ctx.fillStyle = lightColors[lightIndex];
+            
+            for (let i = 0; i < 5; i++) {
+                ctx.beginPath();
+                ctx.arc(
+                    ufo.x + (ufo.width / 6) + (i * ufo.width / 6),
+                    ufo.y + ufo.height - 5,
+                    3, 0, Math.PI * 2
+                );
+                ctx.fill();
+            }
+            
+            ctx.restore();
+        }
+        
+        // Disegna le esplosioni
+        function drawExplosions() {
+            gameState.explosions.forEach((explosion, index) => {
+                const progress = (Date.now() - explosion.startTime) / explosion.duration;
+                
+                if (progress >= 1) {
+                    gameState.explosions.splice(index, 1);
+                    return;
+                }
+                
+                const size = explosion.size * (1 - progress);
+                const alpha = 1 - progress;
+                
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                
+                // Esplosione con particelle
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const particleSize = size * 0.5;
+                    const x = explosion.x + Math.cos(angle) * size * progress * 2;
+                    const y = explosion.y + Math.sin(angle) * size * progress * 2;
+                    
+                    ctx.fillStyle = i % 2 === 0 ? '#ff0' : '#f00';
+                    ctx.beginPath();
+                    ctx.arc(x, y, particleSize, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Centro dell'esplosione
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(explosion.x, explosion.y, size * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            });
+        }
+        
+        // Disegna il HUD (testo informativo)
+        function drawHUD() {
+            ctx.save();
+            ctx.fillStyle = '#fff';
+            ctx.font = '20px "Courier New", monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText(`PUNTI: ${gameState.score}`, 20, 30);
+            ctx.fillText(`LIVELLO: ${gameState.level}`, 20, 60);
+            ctx.fillText(`VITE: ${gameState.lives}`, GAME_WIDTH - 150, 30);
+            ctx.fillText(`ALIENI: ${gameState.aliensRemaining}`, GAME_WIDTH - 150, 60);
+            
+            // Istruzioni durante la pausa
+            if (gameState.paused) {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+                
+                ctx.fillStyle = '#ff0';
+                ctx.font = '40px "Courier New", monospace';
+                ctx.textAlign = 'center';
+                ctx.fillText('PAUSA', GAME_WIDTH / 2, GAME_HEIGHT / 2 - 30);
+                
+                ctx.fillStyle = '#0ff';
+                ctx.font = '24px "Courier New", monospace';
+                ctx.fillText('Premi P per continuare', GAME_WIDTH / 2, GAME_HEIGHT / 2 + 30);
+            }
+            
+            ctx.restore();
+        }
+        
+        // Aggiorna la UI (pannello di controllo)
+        function updateUI() {
+            document.getElementById('score').textContent = gameState.score;
+            document.getElementById('level').textContent = gameState.level;
+            document.getElementById('lives').textContent = gameState.lives;
+            document.getElementById('aliens').textContent = gameState.aliensRemaining;
+            document.getElementById('sound-status').textContent = gameState.soundOn ? 'ON' : 'OFF';
+            document.getElementById('speed').textContent = gameState.speed === 1 ? 'NORMALE' : 'VELOCE';
+        }
+        
+        // Aggiorna la logica del gioco
+        function update(deltaTime) {
+            if (!gameState.gameActive || gameState.paused) return;
+            
+            // Aggiorna il tempo di gioco
+            gameState.gameTime += deltaTime;
+            
+            // Movimento del player
+            if (gameState.keys['ArrowLeft'] || gameState.keys['a']) {
+                gameState.player.x -= gameState.player.speed * gameState.speed;
+                if (gameState.player.x < 0) gameState.player.x = 0;
+            }
+            
+            if (gameState.keys['ArrowRight'] || gameState.keys['d']) {
+                gameState.player.x += gameState.player.speed * gameState.speed;
+                if (gameState.player.x > GAME_WIDTH - gameState.player.width) {
+                    gameState.player.x = GAME_WIDTH - gameState.player.width;
+                }
+            }
+            
+            // Sparo del player
+            if ((gameState.keys[' '] || gameState.keys['ArrowUp']) && gameState.player.canShoot) {
+                shootPlayer();
+                gameState.player.canShoot = false;
+                gameState.player.shotCooldown = 20; // Cooldown in frame
+            }
+            
+            // Gestione del cooldown dello sparo
+            if (gameState.player.shotCooldown > 0) {
+                gameState.player.shotCooldown--;
+                if (gameState.player.shotCooldown === 0) {
+                    gameState.player.canShoot = true;
+                }
+            }
+            
+            // Movimento degli alieni
+            gameState.alienMoveCounter++;
+            if (gameState.alienMoveCounter >= gameState.alienMoveThreshold / gameState.speed) {
+                gameState.alienMoveCounter = 0;
+                
+                // Controlla se gli alieni hanno raggiunto i bordi
+                let changeDirection = false;
+                for (const alien of gameState.aliens) {
+                    if (!alien.alive) continue;
+                    
+                    if ((alien.x <= 10 && gameState.alienDirection === -1) ||
+                        (alien.x >= GAME_WIDTH - alien.width - 10 && gameState.alienDirection === 1)) {
+                        changeDirection = true;
+                        break;
+                    }
+                }
+                
+                // Cambia direzione se necessario
+                if (changeDirection) {
+                    gameState.alienDirection *= -1;
+                    
+                    // Sposta gli alieni in basso
+                    for (const alien of gameState.aliens) {
+                        if (alien.alive) {
+                            alien.y += 20;
+                            
+                            // Controlla se gli alieni hanno raggiunto il fondo
+                            if (alien.y > GAME_HEIGHT - 100) {
+                                gameOver();
+                                return;
+                            }
+                        }
+                    }
+                }
+                
+                // Muovi gli alieni
+                for (const alien of gameState.aliens) {
+                    if (alien.alive) {
+                        alien.x += gameState.alienSpeed * gameState.alienDirection * gameState.speed;
+                        
+                        // Animazione (cambia frame)
+                        alien.frame = alien.frame === 0 ? 1 : 0;
+                    }
+                }
+            }
+            
+            // Aggiorna i colpi del player
+            for (let i = gameState.shots.length - 1; i >= 0; i--) {
+                const shot = gameState.shots[i];
+                shot.y -= 10 * gameState.speed;
+                
+                // Rimuovi i colpi fuori dallo schermo
+                if (shot.y < 0) {
+                    gameState.shots.splice(i, 1);
+                    continue;
+                }
+                
+                // Controlla collisioni con gli alieni
+                for (let j = 0; j < gameState.aliens.length; j++) {
+                    const alien = gameState.aliens[j];
+                    
+                    if (alien.alive && 
+                        shot.x > alien.x && 
+                        shot.x < alien.x + alien.width &&
+                        shot.y > alien.y && 
+                        shot.y < alien.y + alien.height) {
+                        
+                        // Alieno colpito!
+                        alien.alive = false;
+                        gameState.shots.splice(i, 1);
+                        gameState.aliensRemaining--;
+                        
+                        // Punti in base al tipo di alieno
+                        let points = 0;
+                        switch(alien.type) {
+                            case 4: points = 40; break; // Alieno rosso
+                            case 3: points = 30; break; // Alieno viola
+                            default: points = 20; break; // Alieno verde
+                        }
+                        
+                        gameState.score += points;
+                        
+                        // Crea un'esplosione
+                        createExplosion(alien.x + alien.width / 2, alien.y + alien.height / 2, 20);
+                        
+                        // Suono
+                        sounds.alienHit.play();
+                        
+                        // Controlla se tutti gli alieni sono stati distrutti
+                        if (gameState.aliensRemaining === 0) {
+                            levelComplete();
+                        }
+                        
+                        updateUI();
+                        break;
+                    }
+                }
+                
+                // Controlla collisioni con l'UFO
+                if (gameState.ufo && 
+                    shot.x > gameState.ufo.x && 
+                    shot.x < gameState.ufo.x + gameState.ufo.width &&
+                    shot.y > gameState.ufo.y && 
+                    shot.y < gameState.ufo.y + gameState.ufo.height) {
+                    
+                    // UFO colpito!
+                    gameState.score += 200;
+                    createExplosion(gameState.ufo.x + gameState.ufo.width / 2, 
+                                   gameState.ufo.y + gameState.ufo.height / 2, 40);
+                    sounds.ufoHit.play();
+                    gameState.ufo = null;
+                    gameState.shots.splice(i, 1);
+                    updateUI();
+                }
+            }
+            
+            // Sparo alieno casuale
+            if (Math.random() < gameState.alienShootChance * gameState.speed) {
+                shootAlien();
+            }
+            
+            // Aggiorna i colpi degli alieni
+            for (let i = gameState.alienShots.length - 1; i >= 0; i--) {
+                const shot = gameState.alienShots[i];
+                shot.y += 5 * gameState.speed;
+                
+                // Rimuovi i colpi fuori dallo schermo
+                if (shot.y > GAME_HEIGHT) {
+                    gameState.alienShots.splice(i, 1);
+                    continue;
+                }
+                
+                // Controlla collisioni con il player
+                if (shot.x > gameState.player.x && 
+                    shot.x < gameState.player.x + gameState.player.width &&
+                    shot.y > gameState.player.y && 
+                    shot.y < gameState.player.y + gameState.player.height) {
+                    
+                    // Player colpito!
+                    gameState.lives--;
+                    gameState.alienShots.splice(i, 1);
+                    
+                    // Crea un'esplosione
+                    createExplosion(
+                        gameState.player.x + gameState.player.width / 2,
+                        gameState.player.y + gameState.player.height / 2,
+                        30
+                    );
+                    
+                    // Suono
+                    sounds.playerHit.play();
+                    
+                    // Controlla se il gioco è finito
+                    if (gameState.lives <= 0) {
+                        gameOver();
+                    }
+                    
+                    updateUI();
+                }
+            }
+            
+            // Gestione UFO
+            if (!gameState.ufo && Math.random() < gameState.ufoSpawnChance * gameState.speed) {
+                spawnUFO();
+            }
+            
+            if (gameState.ufo) {
+                // Muovi l'UFO
+                gameState.ufo.x += gameState.ufo.speed * gameState.speed;
+                
+                // Rimuovi l'UFO se esce dallo schermo
+                if ((gameState.ufo.speed > 0 && gameState.ufo.x > GAME_WIDTH) ||
+                    (gameState.ufo.speed < 0 && gameState.ufo.x < -gameState.ufo.width)) {
+                    gameState.ufo = null;
+                }
+            }
+            
+            // Aggiorna le esplosioni
+            for (let i = gameState.explosions.length - 1; i >= 0; i--) {
+                const explosion = gameState.explosions[i];
+                const progress = (Date.now() - explosion.startTime) / explosion.duration;
+                
+                if (progress >= 1) {
+                    gameState.explosions.splice(i, 1);
+                }
+            }
+        }
+        
+        // Crea un'esplosione
+        function createExplosion(x, y, size) {
+            gameState.explosions.push({
+                x: x,
+                y: y,
+                size: size,
+                startTime: Date.now(),
+                duration: 500 // ms
+            });
+        }
+        
+        // Sparo del player
+        function shootPlayer() {
+            gameState.shots.push({
+                x: gameState.player.x + gameState.player.width / 2,
+                y: gameState.player.y
+            });
+            
+            sounds.shoot.play();
+        }
+        
+        // Sparo alieno
+        function shootAlien() {
+            // Trova un alieno vivo a caso
+            const aliveAliens = gameState.aliens.filter(alien => alien.alive);
+            if (aliveAliens.length === 0) return;
+            
+            const alien = aliveAliens[Math.floor(Math.random() * aliveAliens.length)];
+            
+            gameState.alienShots.push({
+                x: alien.x + alien.width / 2,
+                y: alien.y + alien.height
+            });
+        }
+        
+        // Spawn di un UFO
+        function spawnUFO() {
+            const fromLeft = Math.random() > 0.5;
+            
+            gameState.ufo = {
+                x: fromLeft ? -60 : GAME_WIDTH,
+                y: 40,
+                width: 60,
+                height: 30,
+                speed: fromLeft ? 2 : -2
+            };
+            
+            sounds.ufoSpawn.play();
+        }
+        
+        // Livello completato
+        function levelComplete() {
+            gameState.gameActive = false;
+            sounds.levelUp.play();
+            
+            // Mostra lo schermo dell'intermezzo appropriato
+            if (gameState.level === 1) {
+                showJokeScreen(1);
+            } else if (gameState.level === 2) {
+                showJokeScreen(2);
+            } else if (gameState.level === 3) {
+                showJokeScreen(3);
+            } else {
+                // Passa direttamente al livello successivo
+                nextLevel();
+            }
+        }
+        
+        // Mostra lo schermo dell'intermezzo
+        function showJokeScreen(jokeNumber) {
+            const screen = document.getElementById(`jokeScreen${jokeNumber}`);
+            if (screen) {
+                screen.classList.remove('hidden');
+            }
+        }
+        
+        // Passa al livello successivo
+        function nextLevel() {
+            gameState.level++;
+            gameState.alienSpeed += 0.5;
+            gameState.alienShootChance += 0.001;
+            gameState.ufoSpawnChance += 0.0005;
+            
+            // Ricrea gli alieni
+            createAliens();
+            
+            // Riprendi il gioco
+            gameState.gameActive = true;
+            
+            updateUI();
+        }
+        
+        // Game over
+        function gameOver() {
+            gameState.gameActive = false;
+            document.getElementById('finalScore').textContent = gameState.score;
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+            sounds.explosion.play();
+        }
+        
+        // Avvia una nuova partita
+        function newGame() {
+            // Resetta lo stato del gioco
+            gameState = {
+                score: 0,
+                level: 1,
+                lives: 3,
+                aliensRemaining: 50,
+                gameActive: true,
+                paused: false,
+                soundOn: true,
+                speed: 1,
+                player: {
+                    x: GAME_WIDTH / 2 - 25,
+                    y: GAME_HEIGHT - 80,
+                    width: 50,
+                    height: 40,
+                    speed: 8,
+                    canShoot: true,
+                    shotCooldown: 0
+                },
+                aliens: [],
+                alienRows: 5,
+                alienCols: 10,
+                alienWidth: 40,
+                alienHeight: 30,
+                alienSpeed: 1,
+                alienDirection: 1,
+                alienMoveCounter: 0,
+                alienMoveThreshold: 30,
+                alienShootChance: 0.005,
+                shots: [],
+                alienShots: [],
+                ufo: null,
+                ufoSpawnChance: 0.001,
+                explosions: [],
+                keys: {},
+                lastTime: 0,
+                gameTime: 0
+            };
+            
+            // Nascondi tutte le schermate
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            document.getElementById('jokeScreen1').classList.add('hidden');
+            document.getElementById('jokeScreen2').classList.add('hidden');
+            document.getElementById('jokeScreen3').classList.add('hidden');
+            
+            // Inizializza il gioco
+            createAliens();
+            updateUI();
+        }
+        
+        // Game loop principale
+        function gameLoop(timestamp) {
+            if (!gameState.lastTime) gameState.lastTime = timestamp;
+            const deltaTime = timestamp - gameState.lastTime;
+            gameState.lastTime = timestamp;
+            
+            // Aggiorna e disegna il gioco
+            update(deltaTime);
+            draw();
+            
+            // Continua il loop
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Gestione degli eventi tastiera
+        document.addEventListener('keydown', (e) => {
+            gameState.keys[e.key] = true;
+            
+            // Pausa
+            if (e.key === 'p' || e.key === 'P') {
+                gameState.paused = !gameState.paused;
+                updateUI();
+            }
+            
+            // Suono
+            if (e.key === 's' || e.key === 'S') {
+                gameState.soundOn = !gameState.soundOn;
+                updateUI();
+            }
+            
+            // Velocità
+            if (e.key === 'r' || e.key === 'R') {
+                gameState.speed = gameState.speed === 1 ? 2 : 1;
+                updateUI();
+            }
+            
+            // ESC per uscire
+            if (e.key === 'Escape') {
+                if (gameState.gameActive) {
+                    gameState.gameActive = false;
+                    document.getElementById('startScreen').classList.remove('hidden');
+                }
+            }
+            
+            // Previeni il comportamento predefinito per i tasti usati nel gioco
+            if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'a', 'd'].includes(e.key)) {
+                e.preventDefault();
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            gameState.keys[e.key] = false;
+        });
+        
+        // Gestione dei pulsanti
+        document.getElementById('startBtn').addEventListener('click', () => {
+            document.getElementById('startScreen').classList.add('hidden');
+            newGame();
+        });
+        
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            newGame();
+        });
+        
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            gameState.paused = !gameState.paused;
+            updateUI();
+        });
+        
+        document.getElementById('soundBtn').addEventListener('click', () => {
+            gameState.soundOn = !gameState.soundOn;
+            updateUI();
+        });
+        
+        document.getElementById('speedBtn').addEventListener('click', () => {
+            gameState.speed = gameState.speed === 1 ? 2 : 1;
+            updateUI();
+        });
+        
+        // Pulsanti per continuare dopo gli intermezzi
+        document.getElementById('continueBtn1').addEventListener('click', () => {
+            document.getElementById('jokeScreen1').classList.add('hidden');
+            nextLevel();
+        });
+        
+        document.getElementById('continueBtn2').addEventListener('click', () => {
+            document.getElementById('jokeScreen2').classList.add('hidden');
+            nextLevel();
+        });
+        
+        document.getElementById('continueBtn3').addEventListener('click', () => {
+            document.getElementById('jokeScreen3').classList.add('hidden');
+            nextLevel();
+        });
+        
+        // Inizializza il gioco quando la pagina è caricata
+        window.addEventListener('load', initGame);
+    </script>
+</body>
+</html>

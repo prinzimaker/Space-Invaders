@@ -1,0 +1,84 @@
+> Tra i file di progetto ti ho copiato due programmi che sono lo stesso programma in versione 1.0 e 2.0
+Sono scritti in BASIC per windows del 1994
+
+Dobbiamo realizzare lo stesso programma in javascript.
+
+Puoi farlo?
+
+---
+Sì, posso farlo! È un progetto interessante - "ALDUS INVASION" è un clone di Space Invaders scritto in QBasic.
+
+Prima di iniziare, lasciami leggere le best practices per la creazione di interfacce web:Perfetto! Analizzo il codice BASIC per capire la struttura del gioco:
+
+**Elementi principali:**
+- Risoluzione 320x200 (SCREEN 13 - MCGA 256 colori)
+- 50 alieni (5 righe × 10 colonne) con 5 tipi diversi
+- Astronave del giocatore con sparo
+- UFO bonus
+- Livelli multipli con difficoltà crescente
+- Top Ten dei punteggi
+- Intermezzi animati tra i livelli
+
+Creerò una versione JavaScript fedele all'originale con estetica retro-gaming:Ho creato la conversione JavaScript di **ALDUS INVASION**!
+
+**Cosa ho implementato:**
+
+| Elemento Originale | Implementazione JS |
+|---|---|
+| SCREEN 13 (320×200) | Canvas HTML5 scalato 2× |
+| Sprite in DATA | Oggetti JavaScript con palette VGA |
+| SOUND/PLAY | Web Audio API |
+| GET/PUT grafico | Sprite caching con canvas offscreen |
+| Top Ten su file BIN | localStorage |
+| Controlli tastiera | KeyboardEvent listeners |
+
+**Controlli:**
+- **← →** o **A D**: Muovi astronave
+- **SPAZIO**: Spara
+- **P**: Pausa
+- **S**: Attiva/disattiva suono
+- **ENTER**: Inizia partita
+
+**Caratteristiche fedeli all'originale:**
+- 5 tipi di alieni (Giacomo, Giovanni, Vincenzo, Aldo, Vicky)
+- 2 tipi di UFO bonus
+- Velocità alieni che aumenta con meno nemici
+- Livelli multipli con difficoltà crescente
+- Sistema Top Ten persistente
+- Effetto CRT/scanlines per atmosfera retro
+
+Vuoi che aggiunga qualcosa? Ad esempio:
+- Gli intermezzi animati ("Joke") tra i livelli
+- Più frame di esplosione
+- Barriere/bunker come nell'originale
+- Altre migliorie?
+---
+> devi aggiungere una gestione migliore dei tempi, l'ufo ad esempio è troppo veloce.
+Mantieni anche i joke originali tra i livelli
+---
+Hai ragione, devo sistemare i tempi e aggiungere i joke. Lascami rileggere il codice originale per i dettagli sui timing e sugli intermezzi:Ora ho tutti i dettagli. Creo la versione migliorata con timing corretti e i joke originali:Ecco la versione migliorata!
+
+**Miglioramenti apportati:**
+
+| Problema | Soluzione |
+|----------|-----------|
+| **UFO troppo veloce** | Aumentato `TIMING.UFO_MOVE` da ~16ms a 200ms - ora si muove 3 pixel ogni 200ms come nell'originale |
+| **Timing generale** | Sistema basato su accumulatori di tempo con `deltaTime` per ogni elemento separatamente |
+| **Alieni** | Velocità progressiva calibrata sui valori `QMM` dell'originale (da 400ms con 50 alieni a 25ms con 3) |
+
+**Joke implementati:**
+- **Joke1** (Livello 1→2): Mostro che corre inseguito da UFO che spara
+- **Joke2** (Livello 2→3): UFO e Pacman che si inseguono, poi scappano
+- **Joke3** (Livello 3→4): Mostri avanzano, razzo spara, UFO arriva e distrugge il razzo
+- **Joke4** (Livello 4→5): Messaggio originale "QUESTO METTETECELO VOI!" (era vuoto nel codice BASIC)
+
+**Timing calibrati sull'originale:**
+```
+UFO_MOVE: 200ms         (aspetta ~0.1-0.2 nel BASIC)
+ALIEN_BASE_MOVE: 400ms  (QMM=24 nel BASIC)
+ALIEN_SHOOT_CHECK: 600ms
+UFO_SPAWN_CHECK: 1200ms
+JOKE_FRAME: 100ms       (aspetta 0.1 nel BASIC)
+```
+
+Vuoi che modifichi qualcos'altro? Ad esempio posso aggiustare ulteriormente i tempi se qualcosa ti sembra ancora troppo veloce o lento.

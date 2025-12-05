@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aldus Invasion - JS Conversion</title>
+    <style>
+        body { margin: 0; padding: 0; background: #000; color: #0f0; font-family: 'Courier New', monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
+        canvas { border: 2px solid #0f0; image-rendering: pixelated; image-rendering: -moz-crisp-edges; image-rendering: crisp-edges; box-shadow: 0 0 20px #0f0; }
+        #menu { position: absolute; background: rgba(0,0,0,0.95); padding: 20px; border: 2px solid #0f0; display: none; max-width: 600px; text-align: center; }
+        button { background: #0f0; color: #000; border: none; padding: 10px 20px; font-family: 'Courier New', monospace; font-weight: bold; cursor: pointer; margin: 5px; }
+        button:hover { background: #0a0; }
+        #topTen { font-size: 12px; margin-top: 10px; max-height: 200px; overflow-y: auto; }
+        .topten-entry { margin: 2px 0; font-size: 11px; }
+        #hud { position: absolute; top: 5px; left: 5px; right: 5px; display: flex; justify-content: space-between; font-size: 12px; text-shadow: 1px 1px 2px #000; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas" width="320" height="200"></canvas>
+    <div id="hud">
+        <div id="score">000000 Pts</div>
+        <div id="level">LEVEL 1</div>
+        <div id="lives">LIVES: 3</div>
+    </div>
+    <div id="menu">
+        <h2>ALDUS INVASION v2.0</h2>
+        <p>← → Movimento | SPAZIO Sparo | P Pausa | S Suono | ESC Menu</p>
+        <button onclick="startGame()">INIZIA GIOCO</button>
+        <button onclick="showTopTen()">TOP TEN</button>
+        <button onclick="toggleSound()">SUONO: ON</button>
+        <div id="topTen"></div>
+    </div>
+
+    <script>
+        // === SETUP GLOBALE ===
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const menu = document.getElementById('menu');
+        const scoreEl = document.getElementById('score');
+        const levelEl = document.getElementById('level');
+        const livesEl = document.getElementById('lives');
+        
+        // Audio context
+        let audioContext = null;
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // === PALETTE COLORI VGA ESATTA ===
+        const hexToColor = {
+            '0': '#000000', '1': '#0000AA', '2': '#00AA00', '3': '#00AAAA', '4': '#AA0000', '5': '#AA00AA', '6': '#AA5500', '7': '#AAAAAA',
+            '8': '#555555', '9': '#5555FF', 'A': '#55FF55', 'B': '#55FFFF', 'C': '#FF5555', 'D': '#FF55FF', 'E': '#FFFF55', 'F': '#FFFFFF'
+        };
+
+        // === DISEGNO SPRITE - CONVERSIONE ESATTA ===
+        function drawPixelData(data, x, y, mode = 'PSET') {
+            if (!data) return;
+            
+            if (mode === 'XOR') {
+                ctx.globalCompositeOperation = 'xor';
+            } else {
+                ctx.globalCompositeOperation = 'source-over';
+            }
+            
+            const lines = data.split('\n');
+            lines.forEach((line, row) => {
+                if (!line.trim()) return;
+                for (let col = 0; col < line.length; col++) {
+                    const hex = line[col];
+                    if (hex !== ' ' && hexToColor[hex]) {
+                        ctx.fillStyle = hexToColor[hex];
+                        ctx.fillRect(x + col, y + row, 1, 1);
+                    }
+                }
+            });
+            
+            ctx.globalCompositeOperation = 'source-over';
+        }
+
+        // === SPRITE DATA - CONVERTITI DALLE DATA DEL BASIC ===
+        const sprites = {
+            razzo: [
+                // Frame 0
+                "        4          \n        4          \n        4          \n       414         \n       414         \n      41314        \n     4137314       \n    413337314      \n    413337314      \n    411333114      \n    411111114      \n    441111144      \n    244424442      \n    211121112      \n   22111211122     \n   22111211122     \n   22111211122     \n  2225552555222    \n  2222  2  2222    \n  222   2   222    \n 222    2    222   \n 22     2     22   \n 2      2      2   ",
+                // Frame 1 (propulsione)
+                "        4          \n        4          \n        4          \n       414         \n       414         \n      41314        \n     4137314       \n    413337314      \n    413337314      \n    411333114      \n    411111114      \n    441111144      \n    244424442      \n    211121112      \n   22111211122     \n   22111211122     \n   22111211122     \n  2225552555222    \n  2222FF2FE2222    \n  222EEF2FE6222    \n 2226EEE26EE6222   \n 2226EEE26EE6222   \n 2   6DE2E6E   2   \n    6 D6ED6        \n       66E 6       \n        6 E        ",
+                // Frame 2 (propulsione alternata)
+                "        4          \n        4          \n        4          \n       414         \n       414         \n      41314        \n     4137314       \n    413337314      \n    413337314      \n    411333114      \n    411111114      \n    441111144      \n    244424442      \n    211121112      \n   22111211122     \n   22111211122     \n   22111211122     \n  2225552555222    \n  2222EF2FF2222    \n  222EEF2FE6222    \n 22266EE26EE6222   \n 22 E6EE2EE66 22   \n 2  E6DF2E66   2   \n     DDFED6        \n    E E66          \n      E            "
+            ],
+            explosion: [
+                // 6 frame di esplosione
+                "                   \n    E              \n        B          \n       4F4   E     \n       414         \n   E  413B4        \n 4  EE137EB4E E    \n  4 4E3E3DEB4E     \n  4 4BE3EDDEE 4  4 \n  E EEEEEEE14  E   \n   E4BFEEEEE4 44   \n   E44BEEEE444 E   \n   4F44EEE442   E  \n  E421EEE1E124     \n  422EB14FE122 E   \n E42EEE12444EEE    \n4 E2FF1BB11E22     \n  2E25DDDE544EE    \n 422E2  2EE4442 4  \n  2D2   2   4444   \n 244E E EE   222   \n D44    4    444   \n 2      2      2   ",
+                "                   \n    E       4      \n         4         \n  E    4     E     \n      441E 4  6    \n4    441DB44 6     \n    EE1EEEE4E E    \n   44EDEDDEB4E 4  4\n 4 44BEEEDDEE66 E  \n    EEEDDDE14E     \n E E4BFEDEEEEE44   \n  4E4FFEDDE444     \n  44FFFDDED466 E   \n  E441EDEDE1446  4 \n  4EEEE1EFE1EE     \n E42EEE16444EEE  4 \n  EEFF1BB11E66     \n  4E25DDDE544EE    \n 422E4 44EE4442 4  \n  4D4  444  4444   \n E44E E EE   444   \n D44 E  44   444   \n 4      4      4   ",
+                "                   \n                   \n  E        6       \n             E     \n     6F    4  6    \n       6E    6     \n    EE1E6666E E    \n   46E8ED8884E     \n   46BEE8D8EE66 8  \n    EFFD88E14E   4 \n   E4B68 88EEE44   \n  444F688DE444     \n  64666DF8DE66     \n  EE  EE EEEEE88   \n  6EFF61E8DE4E   48\n E62E6616E D6EE    \n  EEFF1B 11D86    8\n  6E25DDDE5448E    \n 622E4F 44E4442    \n  4D444444446844 8 \n E66E E EE64 884   \n D44 E 6 4 6 464   \n 4  6   4 6  444   ",
+                "                   \n                   \n                   \n                   \n     6             \n                   \n    E  D           \n   4     88        \n       E8D8EE 6 8  \n     4FD88E14    4 \n    4B68888EEE     \n    4F688DE44      \n    666  8DE66     \n   44D88E8E1E      \n   E448888DE4E     \n    E6688 DD6E     \n    448B 86D868    \n  6E65486E86488    \n   2E46464848828   \n  4D446664646888   \n E86E8886 846888   \n D4888668486888888 \n888868668868844488 \n8868686888688866888",
+                "                   \n                   \n                   \n                   \n                   \n                   \n                   \n                   \n                   \n                   \n                   \n                4  \n                   \n      88 8 1     8 \n      8888D 4      \n     66888DD6E     \n    448 886D8688   \n  6E6868648 68888  \n  8864646 84 8688  \n  86446 668686888  \n 886E 686E8 6 6868 \n88488868 6868 8888 \n88686866886 8 66888\n8868686888688866888",
+                "                   \n                   \n                   \n                   \n                   \n                   \n                   \n                   \n                   \n                   \n                   \n                   \n                   \n                   \n                   \n                   \n                   \n  6E6    48  8 88  \n  8 6    88  8 88  \n 8884 6  68 8 888  \n88867 8  8 6 68 888\n8888888 868 88 8888\n8868686888688866888"
+            ],
+            mostro: {
+                0: [ // Tipo 0 (prima fila)
+                    "  55  22222  55  \n    522222225    \n  2222228222222  \n  2227072227072  \n  2222228222222  \n  2232328232322  \n    333363333    \n     3336 333    \n   333  6  333   \n 333      333    ",
+                    " 5   222 222   5 \n  5552222222555  \n  2222228222222  \n  2707222707222  \n  2222228222222  \n   23238383232   \n    333343333    \n    333 4333     \n   333     333   \n    333      333 "
+                ],
+                1: [ // Tipo 1 (seconda fila)
+                    "        666      \n      6633366    \n  55663E333E36655\n  55663E333E36655\n     663333366   \n     663333366   \n      3631363    \n    66  66  66   \n   66  66  66    \n  66  66  66     ",
+                    "      666        \n    6633366      \n55663E333E36655  \n55663E333E36655  \n   663333366     \n   663333366     \n    3631363      \n   66  66  66    \n    66  66  66   \n     66  66  66  "
+                ],
+                2: [ // Tipo 2 (terza fila)
+                    "  66         66  \n    6 35553 6    \n    355555553    \n  3577555577553  \n 355555555555553 \n 355555333555553 \n  3555555555553  \n    5   5   5    \n   5    5    5   \n    55     55    ",
+                    "        6        \n   66 35553 66   \n  6 355555553 6  \n  3557755557753  \n 355555535555553 \n 355555333555553 \n  3555553555553  \n   55   5   55   \n  5     5     5  \n 55    5 5    55 "
+                ],
+                3: [ // Tipo 3 (quarta fila)
+                    "       555 555   \n 77   57775      \n  7 177777771    \n  777E477E47777  \n    177777771 7  \n    177444771 77 \n      77777      \n     77   77     \n    77     77    \n 7777     7777   ",
+                    "   555 555       \n      57775   77 \n    177777773 7  \n  77774E774E777  \n  7 377777773    \n 77 377747773    \n      77777      \n     77   77     \n    77     77    \n   7777     7777 "
+                ],
+                4: [ // Tipo 4 (quinta fila)
+                    " 64           46 \n   44411111444   \n    111111111    \n   17331733111   \n   11111111111   \n  1111111111111  \n  11111EEE11111  \n   11111111111   \n   11     11     \n   1111   1111   ",
+                    "                 \n     4111114     \n   44111111144   \n  6 113371337 6  \n  1111111111111  \n 111111111111111 \n 111111E1E111111 \n  111111E111111  \n    11     11    \n   1111   1111   "
+                ]
+            },
+            ufo: [
+                // Tipo 0
+                [
+                    "           6666           \n          600006          \n      6E66666666666E6     \n  6666633666666666336666  \n 644443333444444433334446 \n  6666633666666666336666  \n   66666666466466666666   \n          468864          ",
+                    "           6666           \n          6BBBB6          \n      686666666666686     \n  6666633666666666336666  \n 644443333444444433334446 \n  6666633666666666336666  \n   66666666466466666666   \n         46611664         "
+                ],
+                // Tipo 1
+                [
+                    "            88            \n        2222222222        \n      22000222000222      \n22222222000222000222222222\n   64447774447774447776   \n222EE2222222222222222EE222\n          222222          \n      22222    22222      ",
+                    "            EE            \n        2222222222        \n      22000222000222      \n22222222000222000222222222\n   67774447774447774446   \n222882222222222222222882222\n          222222          \n      22222    22222      "
+                ]
+            ],
+            mspar: "5E5\n555\n 5 \n 5 \n F ",
+            pspar: " D \nD4D\n 4 \n 4 \n 4 \n 4 \n333\n3E3",
+            lives: [
+                "   4   ",
+                "  414  ",
+                "  111  ",
+                "  111  ",
+                "  222  ",
+                " 2 2 2 ",
+                " 2 2 2 "
+            ],
+            // Sprite per intermezzi
+            pac: [
+                // 7 frame di pac-man
+                "         EEEE          \n      EEEEEEEEEE       \n    EEEEEEEEEEEEEE     \n   EEEEEEEEEEEEEEEE    \n   EEEEEEEEEEEEEEEE    \n  EEEEEEEEEEEEEEEEEE   \n           EEEEEEEEE   \n  EEEEEEEEEEEEEEEEEE   \n   EEEEEEEEEEEEEEEE    \n   EEEEEEEEEEEEEEEE    \n    EEEEEEEEEEEEEE     \n      EEEEEEEEEE       \n         EEEE          ",
+                "         EEEE          \n      EEEEEEEEEE       \n    EEEEEEEEEEEEEE     \n   EEEEEEEEEEEEEEEE    \n     EEEEEEEEEEEEEE    \n         EEEEEEEEEEE   \n           EEEEEEEEE   \n         EEEEEEEEEEE   \n     EEEEEEEEEEEEEE    \n   EEEEEEEEEEEEEEEE    \n    EEEEEEEEEEEEEE     \n      EEEEEEEEEE       \n         EEEE          ",
+                "         EEEE          \n      EEEEEEEEEE       \n    EEEEEEEEEEEEEE     \n     EEEEEEEEEEEEEE    \n       EEEEEEEEEEEE    \n         EEEEEEEEEEE   \n           EEEEEEEEE   \n         EEEEEEEEEEE   \n       EEEEEEEEEEEE    \n     EEEEEEEEEEEEEE    \n    EEEEEEEEEEEEEE     \n      EEEEEEEEEE       \n         EEEE          ",
+                "      77777      \n    777777777    \n  7777777777777  \n 777 7777777 777 \n 77   77777   77 \n 777 7777777 777 \n 777777777777777 \n 7777 7 7 7 7777 \n 777 7 7 7 7 777 \n 777777777777777 \n  7777 7777 7777 \n   77   77   77  ",
+                "      77777      \n    777777777    \n  7777777777777  \n 777 7777777 777 \n 77   77777   77 \n 777 7777777 777 \n 777777777777777 \n 7777 7 7 7 7777 \n 777 7 7 7 7 777 \n 777777777777777 \n 777 7777 7777   \n 77   77   77    ",
+                "      44444      \n    444444444    \n  4444444444444  \n 44fff44444fff44 \n 44ff044444ff044 \n 44fff44444fff44 \n 444444444444444 \n 444444444444444 \n 444444444444444 \n 444444444444444 \n 444 4444 4444   \n 44   44   44    ",
+                "      44444      \n    444444444    \n  4444444444444  \n 44fff44444fff44 \n 44ff044444ff044 \n 44fff44444fff44 \n 444444444444444 \n 444444444444444 \n 444444444444444 \n 444444444444444 \n  4444 4444 4444 \n   44   44   44  "
+            ],
+            ufoBoom: [
+                "     FFFF  4444           \n    FF  FF44FFFF          \n      4FF44FF44FF44FFFF   \n  4444FF444FF44FF4FF44FF  \n 4444FF4444FF44FF4FF44FF4 \n  44FFFFFF4FF44FF4FF44FF  \n   444444444FFFF44FF44FF  \n         44444444  FFFF   ",
+                "            88            \n        888888888EEEE     \n      888EEEEEE8EE88EE    \n888EEEE88EE88888EE88EE8888\n  EE88EE88EEEE88EE88EE8   \n88888EE888888EE88EEEE88888\n  EE  EE EEEEE88          \n   EEEE8888    88888      "
+            ],
+            // Testo per titolo
+            title: [
+                " FFFF FFF  FFFF FFFF F   F  FF  FFF  FFFF    FFF  FF  F   F FFFF    7   7 777  777 777 777 7777 7   7   7           BB   BB BB     BB            BB   BB         BB                BB  ",
+                " B    B  B B    B    B   B B  B B  B B      E    E  E EE EE E       7   7 7  7  7   7   7  7    77  7   7           BB   BB BB     BB            BB   BB                               ",
+                " BBB  B  B BBB  BBB  B B B B  B B  B BBB    E EE E  E E E E EEE     7 7 7 7  7  7   7   7  777  7 7 7   777  7  7   BB   BB BB  BBBBB   BBBBB    BB   BB BB BBB  BB BB BBB  BBBBBB BB  ",
+                " 3    333  3    3    3 3 3 3333 333  3      6  6 6666 6   6 6       7 7 7 777   7   7   7  7    7  77   7  7 7  7   BB   BB BB BB  BB  BB   BB   BB   BB  BB  BB BB  BB  BB    BB  BB  ",
+                " 1    1  1 1111 1111  1 1  1  1 1  1 1111    44  4  4 4   4 4444     7 7  7  7 777  7   7  7777 7   7   777   77    BBBBBBB BB BB  BB  BB   BB   BBBBBB   BB     BB  BB  BB   BB   BB  "
+            ],
+            livesText: "8833388333383888888883888883388333888\n8 3  3 3  8 3888888833888 3  3 3  388\n8 38 3 3338 3888888  3888 38 3 38 388\n8 3338 3 88 38888888 3888 3333 333888\n8 3 83 3333 3333838833383 3  3 3 8888\n8 88 8    8    8 88   8 8 88 8 888888"
+        };
+
+        // === STATO GIOCO - RIPRODUZIONE ESATTA VARIABILI BASIC ===
+        let FlagGame = 1, Level = 1, Pts = 0, Lives = 3;
+        let PosR = 100, FIRE = 0, MaMM = 0, MPos = 0, PoVeMo = 0, Turn = 0;
+        let LMaxR = 70, LMaxL = 1, Mdir = 5, VeGoal = 80, LILI = 5, FlagUfo = 0;
+        let B = 0, Flaag = 0, ExMaMM = 0;
+        let VeCoM = 2, VeCoP = 5.5, LEVDISC = 5;
+        let ExMdir = Mdir;
+        let MFire = [0, 0, 0, 0, 0];
+        let OrMfi = [0, 0, 0, 0, 0];
+        let VeMfi = [0, 0, 0, 0, 0];
+        let MM = 0, QMM = 24;
+        let QMMarr = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22];
+        
+        // Matrice mostri (esattamente come LINEA% del BASIC)
+        let LINEA = Array(6).fill().map(() => Array(10).fill(1));
+        
+        // Controlli
+        let PO = 0;
+        let FlagSuono = true;
+        let FlagRallenty = false;
+        
+        // UFO
+        let PoOrUfo = 0, DirUfo = 3, TUfo = 0, Nufo = 0;
+        
+        // Proiettile giocatore
+        let OrFi = 0, Vefi = 0;
+        
+        // Input
+        const keys = {};
+        
+        // === FUNZIONI SPRITE ===
+        function drawMonster(type, x, y, frame) {
+            if (sprites.mostro[type] && sprites.mostro[type][frame]) {
+                drawPixelData(sprites.mostro[type][frame], x, y);
+            }
+        }
+
+        function drawUfo() {
+            if (FlagUfo && sprites.ufo[Nufo] && sprites.ufo[Nufo][TUfo]) {
+                drawPixelData(sprites.ufo[Nufo][TUfo], PoOrUfo, 15);
+            }
+        }
+
+        function drawLives() {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(294, 190, 26, 11);
+            for (let L = 1; L <= Lives; L++) {
+                const lx = 320 - (L * 8);
+                sprites.lives.forEach((line, row) => {
+                    for (let j = 0; j < line.length; j++) {
+                        const hex = line[j];
+                        if (hex !== ' ') {
+                            ctx.fillStyle = hexToColor[hex] || '#000';
+                            ctx.fillRect(lx + j, 192 + row, 1, 1);
+                        }
+                    }
+                });
+            }
+        }
+
+        function drawBase() {
+            // Linea di base (costruita pixel per pixel come nel BASIC)
+            const baseData = [
+                "88888                                                                           8                                                                               8                                                  888888",
+                "88888  7  7  77777 7   7  7777       3   3  333  3   3 33333     4         4    8  3333   333  3   3  3333 33333    333  3   3      333  33333 33333     4444   8  33333 3   3 3333     3333  3333  3   3 33333    888888",
+                // ... tutte le linee della base ...
+            ];
+            baseData.forEach((line, row) => {
+                drawPixelData(line, 0, 183 + row);
+            });
+            
+            // Testo "LIVES:"
+            drawPixelData(sprites.livesText, 215, 185);
+        }
+
+        // === LOGICA GIOCO ESATTA ===
+        function initLevel() {
+            // Reset stato livello
+            PosR = 100; FIRE = 0; MaMM = 0; MPos = 0; PoVeMo = 0; Turn = 0;
+            LMaxR = 70; LMaxL = 1; Mdir = 5; VeGoal = 80; LILI = 5; FlagUfo = 0;
+            B = 0; MaMM = 0; ExMaMM = 0;
+            
+            // Velocità in base al livello
+            VeCoM = 2 + Math.floor(Level / 2);
+            VeCoP = 5.5 + (Level > 2 ? 1 : 0) - (Level > 4 ? 1 : 0);
+            if (Level > 5) { VeCoM = 6; VeCoP = 5; }
+            
+            LEVDISC = 5 + ((Level - 1) * 2);
+            ExMdir = Mdir;
+            
+            // Reset matrice mostri
+            for (let j = 1; j <= 5; j++) {
+                for (let i = 0; i <= 9; i++) {
+                    LINEA[j][i] = 1;
+                }
+            }
+            
+            // Reset proiettili mostri
+            for (let i = 1; i <= 4; i++) MFire[i] = 0;
+            
+            // QMM per livello
+            const levelTable = {
+                1: [24, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22],
+                2: [20, 2, 3, 5, 6, 8, 9, 12, 14, 13, 15, 18],
+                3: [18, 1, 2, 3, 5, 7, 8, 10, 11, 13, 14, 16],
+                4: [16, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14],
+                5: [13, 1, 2, 2, 3, 4, 4, 5, 6, 7, 9, 11]
+            };
+            const data = levelTable[Level] || [11, 1, 2, 2, 3, 3, 4, 4, 5, 6, 8, 10];
+            QMM = data[0];
+            QMMarr = data.slice(1);
+        }
+
+        function updateGame() {
+            // Movimento giocatore (PUT XOR)
+            if (PO !== 0) {
+                ctx.clearRect(PosR, 159, 17, 23);
+                PosR = Math.max(2, Math.min(300, PosR + PO));
+                PO = 0;
+            }
+            
+            // Input
+            if (keys['ArrowLeft']) PO = -6;
+            if (keys['ArrowRight']) PO = 6;
+            if (keys[' '] && FIRE === 0) FIRE = 1;
+            
+            // Proiettili mostri (4 contemporanei)
+            for (let NS = 1; NS <= 4; NS++) {
+                if (MFire[NS] === 2) {
+                    ctx.clearRect(OrMfi[NS], VeMfi[NS], 2, 5);
+                    VeMfi[NS] += VeCoM;
+                    
+                    const PF = checkPixel(OrMfi[NS] + 1, VeMfi[NS] + 5) +
+                               checkPixel(OrMfi[NS], VeMfi[NS] + 4) +
+                               checkPixel(OrMfi[NS] + 2, VeMfi[NS] + 4);
+                    
+                    if (PF !== 0) {
+                        MFire[NS] = 0;
+                        if (VeMfi[NS] > 150 && VeMfi[NS] < 177) {
+                            scoppiaRazzo();
+                            Lives--;
+                            updateHUD();
+                            if (Lives < 1) {
+                                gameState = 'gameover';
+                                return;
+                            }
+                        } else {
+                            playSound(100, 0.2);
+                        }
+                    } else if (VeMfi[NS] >= 177) {
+                        MFire[NS] = 0;
+                    } else {
+                        ctx.fillStyle = '#FF55FF';
+                        ctx.fillRect(OrMfi[NS], VeMfi[NS], 2, 5);
+                    }
+                }
+            }
+            
+            // Movimento mostri
+            MM++;
+            if (MM >= QMM) {
+                MM = 0;
+                moveMonsters();
+            }
+            
+            // Sparo mostri
+            if (Turn > 1) {
+                for (let NS = 1; NS <= 4; NS++) {
+                    if (LILI > 0 && MFire[NS] === 1) {
+                        let PPP = VeGoal;
+                        let F = Math.floor(Math.random() * 9);
+                        if (LINEA[LILI][F] === 0) {
+                            for (let j = LILI - 1; j >= 1; j--) {
+                                PPP -= 15;
+                                if (LINEA[j][F] === 1) break;
+                            }
+                        }
+                        let OF = (F * 25) + 8 + MPos;
+                        let canFire = true;
+                        for (let XX = 1; XX <= 4; XX++) {
+                            if (MFire[XX] && XX !== NS && OrMfi[XX] === OF) {
+                                canFire = false;
+                                break;
+                            }
+                        }
+                        if (canFire) {
+                            OrMfi[NS] = OF;
+                            VeMfi[NS] = 7 + PoVeMo + PPP;
+                            MFire[NS] = 2;
+                        }
+                    }
+                }
+            }
+            
+            // Proiettile giocatore
+            if (FIRE === 1) {
+                OrFi = PosR + 6;
+                Vefi = 148;
+                FIRE = 2;
+            }
+            
+            if (FIRE === 2) {
+                ctx.clearRect(OrFi, Vefi, 2, 4);
+                Vefi -= VeCoP;
+                
+                if (Vefi < 5) {
+                    FIRE = 0;
+                } else {
+                    const PF = checkPixel(OrFi + 1, Vefi) +
+                               checkPixel(OrFi + 1, Vefi + 3) +
+                               checkPixel(OrFi, Vefi + 1) +
+                               checkPixel(OrFi + 2, Vefi + 2);
+                    
+                    if (PF !== 0) {
+                        FIRE = 0;
+                        ExMaMM = MaMM;
+                        
+                        // Collisione con mostri
+                        for (let i = 0; i <= 9; i++) {
+                            for (let j = 1; j <= 5; j++) {
+                                if (LINEA[j][i] === 1) {
+                                    let Col = 0;
+                                    if (OrFi > (i * 25) + MPos && OrFi < (i * 25) + 4 + MPos + 18) Col++;
+                                    if (Vefi > j * 15 + PoVeMo - 1 && Vefi < (j * 15 + PoVeMo) + 12) Col++;
+                                    if (Col === 2) {
+                                        LINEA[j][i] = 0;
+                                        MaMM++;
+                                        Pts += 10;
+                                        playSound(200, 0.5);
+                                        if (MaMM > (25 - (Level * 3))) Pts += (5 * Level);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Collisione UFO
+                        if (ExMaMM === MaMM && FlagUfo === 1) {
+                            let Col = 0;
+                            if (OrFi > PoOrUfo && OrFi < PoOrUfo + 25) Col++;
+                            if (Vefi > 14 && Vefi < 25) Col++;
+                            if (Col === 2) {
+                                FlagUfo = 0;
+                                Pts += 200 + (Nufo * 150);
+                                playSound(500, 0.2);
+                            }
+                        }
+                        
+                        updateMonsterSpeed();
+                        updateMargins();
+                    } else {
+                        ctx.fillStyle = '#FFFF00';
+                        ctx.fillRect(OrFi, Vefi, 2, 4);
+                    }
+                }
+            }
+            
+            // Spawn UFO
+            Turn++;
+            if (Turn > 10000) Turn = 2;
+            if (Turn % 25 === 0 && PoVeMo >= 15 && FlagUfo === 0) {
+                let AAA = Math.floor(Math.random() * 60) + 1;
+                if ((Level > 2 && AAA === 25) || 
+                    (Level === 2 && AAA > 24 && AAA < 29) || 
+                    (Level === 1 && AAA > 19 && AAA < 31)) {
+                    FlagUfo = 1;
+                    PoOrUfo = Math.random() < 0.5 ? 290 : 5;
+                    DirUfo = PoOrUfo > 150 ? -3 : 3;
+                    TUfo = 0;
+                    Nufo = Math.random() < 0.5 ? 0 : 1;
+                }
+            }
+            
+            // Movimento UFO
+            if (FlagUfo) {
+                ctx.clearRect(PoOrUfo, 15, 30, 8);
+                PoOrUfo += DirUfo;
+                TUfo = 1 - TUfo;
+                if (PoOrUfo > 290 || PoOrUfo < 5) {
+                    FlagUfo = 0;
+                }
+            }
+            
+            // Verifica invasione
+            if (PoVeMo + VeGoal >= 150) {
+                scoppiaRazzo();
+                Lives = 0;
+                gameState = 'gameover';
+                return;
+            }
+        }
+
+        function moveMonsters() {
+            // Cancella vecchia posizione
+            for (let i = 0; i <= 9; i++) {
+                for (let j = 1; j <= 5; j++) {
+                    if (LINEA[j][i] === 1) {
+                        ctx.clearRect((i * 25) + 2 + MPos, j * 15 + PoVeMo, 18, 12);
+                    }
+                }
+            }
+            
+            // Aggiorna posizione
+            MPos += Mdir;
+            B = 1 - B;
+            if (MPos > LMaxR || MPos < LMaxL) {
+                Mdir = -Mdir;
+                PoVeMo += LEVDISC;
+            }
+            
+            // Disegna nuova posizione
+            for (let i = 0; i <= 9; i++) {
+                for (let j = 1; j <= 5; j++) {
+                    if (LINEA[j][i] === 1) {
+                        drawMonster(j - 1, (i * 25) + 2 + MPos, j * 15 + PoVeMo, B);
+                    }
+                }
+            }
+        }
+
+        function updateMonsterSpeed() {
+            const thresholds = [48, 45, 40, 30, 25, 20, 15, 10, 8, 5, 3];
+            for (let i = 0; i < thresholds.length; i++) {
+                if (MaMM > thresholds[i] - Level) {
+                    QMM = QMMarr[i];
+                    break;
+                }
+            }
+        }
+
+        function updateMargins() {
+            LMaxR = 70; LMaxL = 1; VeGoal = 80;
+            
+            // Margine destro
+            for (let i = 0; i <= 9; i++) {
+                let LL = 0;
+                for (let j = 1; j <= 5; j++) LL += LINEA[j][i];
+                if (LL === 0) LMaxL -= 25; else break;
+            }
+            
+            // Margine sinistro
+            for (let i = 9; i >= 0; i--) {
+                let LL = 0;
+                for (let j = 1; j <= 5; j++) LL += LINEA[j][i];
+                if (LL === 0) LMaxR += 25; else break;
+            }
+            
+            // Altezza massima
+            for (LILI = 5; LILI >= 1; LILI--) {
+                let LL = 0;
+                for (let i = 0; i <= 9; i++) LL += LINEA[LILI][i];
+                if (LL === 0) VeGoal -= 15; else break;
+            }
+        }
+
+        function checkPixel(x, y) {
+            try {
+                const imageData = ctx.getImageData(Math.floor(x), Math.floor(y), 1, 1);
+                return (imageData.data[0] + imageData.data[1] + imageData.data[2] > 0) ? 1 : 0;
+            } catch (e) {
+                return 0;
+            }
+        }
+
+        function scoppiaRazzo() {
+            ctx.clearRect(PosR, 159, 17, 23);
+            for (let i = 0; i < 6; i++) {
+                const colors = ['#FF5555', '#FFFF55', '#FFAA00'];
+                ctx.fillStyle = colors[i % 3];
+                ctx.fillRect(PosR - i * 3, 159 - i * 3, 17 + i * 6, 23 + i * 6);
+            }
+            // Reset proiettili mostri
+            for (let i = 1; i <= 4; i++) MFire[i] = 0;
+        }
+
+        function playSound(freq, duration) {
+            if (!FlagSuono) return;
+            initAudio();
+            
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.frequency.value = freq;
+            oscillator.type = 'square';
+            
+            const now = audioContext.currentTime;
+            gainNode.gain.setValueAtTime(0.1, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + duration);
+            
+            oscillator.start(now);
+            oscillator.stop(now + duration);
+        }
+
+        function updateHUD() {
+            scoreEl.textContent = Pts.toString().padStart(6, '0') + ' Pts';
+            levelEl.textContent = `LEVEL ${Level}`;
+            livesEl.textContent = `LIVES: ${Lives}`;
+            drawLives();
+        }
+
+        // === LOOP PRINCIPALE ===
+        let lastTime = 0;
+        function gameLoop(timestamp) {
+            if (gameState !== 'playing') return;
+            
+            const deltaTime = timestamp - lastTime;
+            lastTime = timestamp;
+            
+            // Clear canvas
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, 320, 200);
+            
+            // Disegna base
+            drawBase();
+            
+            // Disegna mostri
+            for (let i = 0; i <= 9; i++) {
+                for (let j = 1; j <= 5; j++) {
+                    if (LINEA[j][i] === 1) {
+                        drawMonster(j - 1, (i * 25) + 2 + MPos, j * 15 + PoVeMo, B);
+                    }
+                }
+            }
+            
+            // Disegna giocatore
+            drawPixelData(sprites.razzo[0], PosR, 159);
+            
+            // Disegna UFO
+            drawUfo();
+            
+            // Aggiorna logica
+            updateGame();
+            
+            // Update HUD
+            updateHUD();
+            
+            // Verifica fine livello
+            let allDead = true;
+            for (let j = 1; j <= 5; j++) {
+                for (let i = 0; i <= 9; i++) {
+                    if (LINEA[j][i] === 1) allDead = false;
+                }
+            }
+            
+            if (allDead) {
+                nextLevel();
+                return;
+            }
+            
+            if (gameState === 'playing') {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function nextLevel() {
+            Level++;
+            if (Level <= 5) {
+                showIntermission(Level);
+            } else {
+                gameState = 'gameover';
+                setTimeout(gameOver, 1000);
+            }
+        }
+
+        function showIntermission(level) {
+            gameState = 'intermission';
+            let frame = 0;
+            const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF'];
+            
+            const interLoop = setInterval(() => {
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, 320, 200);
+                
+                ctx.fillStyle = colors[frame % 5];
+                ctx.font = '16px Courier New';
+                ctx.textAlign = 'center';
+                ctx.fillText('INTERMEZZO', 160, 80);
+                ctx.fillText(`LIVELLO ${level - 1} → ${level}`, 160, 120);
+                
+                frame++;
+                if (frame > 100) {
+                    clearInterval(interLoop);
+                    initLevel();
+                    gameState = 'playing';
+                    requestAnimationFrame(gameLoop);
+                }
+            }, 50);
+        }
+
+        function gameOver() {
+            gameState = 'gameover';
+            
+            // Salva top ten
+            const topTen = getTopTen();
+            const minScore = Math.min(...topTen.map(e => e.score));
+            if (Pts > minScore) {
+                const name = prompt('Sei nei migliori punteggi! Inserisci il tuo nome (max 18 caratteri):');
+                if (name) {
+                    topTen.push({name: name.substring(0, 18), score: Pts});
+                    topTen.sort((a, b) => b.score - a.score);
+                    topTen.splice(10);
+                    localStorage.setItem('aldusInvasionTopTen', JSON.stringify(topTen));
+                }
+            }
+            
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, 320, 200);
+            ctx.fillStyle = '#FFFF55';
+            ctx.font = '24px Courier New';
+            ctx.textAlign = 'center';
+            ctx.fillText('GAME OVER', 160, 100);
+            ctx.fillStyle = '#FF5555';
+            ctx.font = '16px Courier New';
+            ctx.fillText(`Punteggio: ${Pts}`, 160, 130);
+            
+            setTimeout(() => {
+                FlagGame = 1;
+                showMenu();
+            }, 3000);
+        }
+
+        function getTopTen() {
+            const saved = localStorage.getItem('aldusInvasionTopTen');
+            if (saved) {
+                return JSON.parse(saved);
+            }
+            return Array(10).fill().map((_, i) => ({
+                name: 'Aldus',
+                score: 1000 - i * 100
+            }));
+        }
+
+        function showTopTen() {
+            const topTen = getTopTen();
+            const div = document.getElementById('topTen');
+            div.innerHTML = '<h3>TOP TEN</h3>' + 
+                topTen.map((entry, i) => 
+                    `<div class="topten-entry">${(i + 1).toString().padStart(2, '0')}. ${entry.name.padEnd(18, ' ')} ${entry.score.toString().padStart(6, '0')}</div>`
+                ).join('');
+        }
+
+        function toggleSound() {
+            FlagSuono = !FlagSuono;
+            event.target.textContent = `SUONO: ${FlagSuono ? 'ON' : 'OFF'}`;
+        }
+
+        function startGame() {
+            if (FlagGame === 1) {
+                // Presentazione iniziale
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, 320, 200);
+                drawPixelData(sprites.title[0], 45, 10);
+                setTimeout(() => {
+                    initLevel();
+                    gameState = 'playing';
+                    hideMenu();
+                    requestAnimationFrame(gameLoop);
+                }, 2000);
+                FlagGame = 0;
+            } else {
+                initLevel();
+                gameState = 'playing';
+                hideMenu();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Event listeners
+        document.addEventListener('keydown', e => {
+            keys[e.key] = true;
+            
+            if (e.key === 'p' || e.key === 'P') {
+                if (gameState === 'playing') {
+                    gameState = 'paused';
+                    showMenu();
+                } else if (gameState === 'paused') {
+                    gameState = 'playing';
+                    hideMenu();
+                    requestAnimationFrame(gameLoop);
+                }
+            }
+            
+            if (e.key === 's' || e.key === 'S') {
+                FlagSuono = !FlagSuono;
+            }
+            
+            if (e.key === 'Escape') {
+                if (gameState === 'playing') {
+                    gameState = 'paused';
+                    showMenu();
+                }
+            }
+        });
+        
+        document.addEventListener('keyup', e => {
+            keys[e.key] = false;
+        });
+
+        // Inizializzazione
+        window.addEventListener('load', () => {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, 320, 200);
+            showMenu();
+            showTopTen();
+        });
+    </script>
+</body>
+</html>

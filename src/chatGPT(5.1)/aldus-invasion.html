@@ -1,0 +1,1876 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <title>Aldus Invasion - Porting JavaScript</title>
+  <style>
+    html, body {
+      background: #000;
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-family: monospace;
+    }
+    #container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    canvas {
+      border: 2px solid #444;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    #info {
+      font-size: 12px;
+      color: #ccc;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <canvas id="game" width="320" height="200"></canvas>
+    <div id="info">
+      Frecce SINISTRA/DESTRA = Muovi &nbsp;|&nbsp;
+      SPAZIO = Fuoco &nbsp;|&nbsp;
+      P = Pausa &nbsp;|&nbsp;
+      S = Suono ON/OFF &nbsp;|&nbsp;
+      R = Rallenty &nbsp;|&nbsp;
+      ESC = Esci / Game Over
+    </div>
+  </div>
+
+  <script>
+"use strict";
+
+// ====== Palette VGA-like (0-15) ======
+const palette = [
+  "#000000", // 0 black
+  "#0000AA", // 1 blue
+  "#00AA00", // 2 green
+  "#00AAAA", // 3 cyan
+  "#AA0000", // 4 red
+  "#AA00AA", // 5 magenta
+  "#AA5500", // 6 brown
+  "#AAAAAA", // 7 light gray
+  "#555555", // 8 dark gray
+  "#5555FF", // 9 light blue
+  "#55FF55", // 10 light green
+  "#55FFFF", // 11 light cyan
+  "#FF5555", // 12 light red
+  "#FF55FF", // 13 light magenta
+  "#FFFF55", // 14 yellow
+  "#FFFFFF"  // 15 white
+];
+
+// ====== Sprite sources (estratti dal BASIC originale) ======
+const spriteSources = {
+  "Razzo": [
+    "        4          ",
+    "        4          ",
+    "        4          ",
+    "       414         ",
+    "       414         ",
+    "       414         ",
+    "      41114        ",
+    "      41114        ",
+    "      41114        ",
+    "      41114        ",
+    "      41114        ",
+    "     4111114       ",
+    "     4111114       ",
+    "     4111114       ",
+    "     4111114       ",
+    "     4111114       ",
+    "    411111114      ",
+    "    411111114      ",
+    "    411111114      ",
+    "    411111114      ",
+    "    411111114      ",
+    "    411111114      ",
+    "   221111211122    "
+  ],
+  "razzoFire1": [
+    "        4          ",
+    "        4          ",
+    "        4          ",
+    "       414         ",
+    "       414         ",
+    "       414         ",
+    "      41114        ",
+    "      41114        ",
+    "      41114        ",
+    "      41114        ",
+    "      41114        ",
+    "     4111114       ",
+    "     4111114       ",
+    "     4111114       ",
+    "     4111114       ",
+    "     4111114       ",
+    "    411111114      ",
+    "    411111114      ",
+    "    411111114      ",
+    "    411111114      ",
+    "    411111114      ",
+    "    411111114      ",
+    "   22111211122     ",
+    "  2225552555222    ",
+    "  2222FF2FE2222    ",
+    "  222EEF2FE6222    ",
+    " 2226EEE26EE6222   ",
+    " 2226EEE26EE6222   ",
+    " 2   6DE2E6E   2   ",
+    "    6 D6ED6        ",
+    "       66E 6       ",
+    "        6 E        "
+  ],
+  "razzoFire2": [
+    "        4          ",
+    "        4          ",
+    "        4          ",
+    "       414         ",
+    "       414         ",
+    "       414         ",
+    "      41114        ",
+    "      41114        ",
+    "      41114        ",
+    "      41114        ",
+    "      41114        ",
+    "     4111114       ",
+    "     4111114       ",
+    "     4111114       ",
+    "     4111114       ",
+    "     4111114       ",
+    "    411111114      ",
+    "    411111114      ",
+    "    411111114      ",
+    "    411111114      ",
+    "    411111114      ",
+    "    411111114      ",
+    "   22111211122     ",
+    "  2225552555222    ",
+    "  2222FF2FE2222    ",
+    "  222EEF2FE6222    ",
+    " 2226EEE26EE6222   ",
+    " 2226EEE26EE6222   ",
+    " 2   6DE2E6E   2   ",
+    "    6 D6ED6        ",
+    "       66E 6       ",
+    "        6 E        "
+  ],
+  "Explosion0": [
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "          2       ",
+    "         2F2      ",
+    "        2FF2      ",
+    "        2FF2      ",
+    "        2FF2      ",
+    "        2FF2      ",
+    "         2F2      ",
+    "          2       ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  "
+  ],
+  "Explosion1": [
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "          2       ",
+    "         2F2      ",
+    "        2FF2      ",
+    "       2FFF2      ",
+    "       2EEE2      ",
+    "       2EEE2      ",
+    "       2EEE2      ",
+    "       2EEE2      ",
+    "       2FFF2      ",
+    "        2FF2      ",
+    "         2F2      ",
+    "          2       ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  "
+  ],
+  "Explosion2": [
+    "                  ",
+    "                  ",
+    "                  ",
+    "          2       ",
+    "         2F2      ",
+    "        2FF2      ",
+    "       2EEE2      ",
+    "      2EEFE2      ",
+    "      2EEFE2      ",
+    "      2EEEE2      ",
+    "      2EEEE2      ",
+    "      2EEFE2      ",
+    "      2EEFE2      ",
+    "       2EEE2      ",
+    "        2FF2      ",
+    "         2F2      ",
+    "          2       ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  "
+  ],
+  "Explosion3": [
+    "                  ",
+    "                  ",
+    "          2       ",
+    "         2F2      ",
+    "        2EEE2     ",
+    "       2EEFE2     ",
+    "      2EEFFE2     ",
+    "      2EFEFE2     ",
+    "      2EFEFE2     ",
+    "      2EFEFE2     ",
+    "      2EFEFE2     ",
+    "      2EFEFE2     ",
+    "      2EFEFE2     ",
+    "      2EEFFE2     ",
+    "      2EEFE2      ",
+    "       2EEE2      ",
+    "        2F2       ",
+    "         2        ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  "
+  ],
+  "Explosion4": [
+    "                  ",
+    "          2       ",
+    "         2F2      ",
+    "        2EEE2     ",
+    "       2EEFE2     ",
+    "      2EFEFE2     ",
+    "     2EFEFFE2     ",
+    "     2EFEFFE2     ",
+    "     2EFEFFE2     ",
+    "     2EFEFFE2     ",
+    "     2EFEFFE2     ",
+    "     2EFEFFE2     ",
+    "     2EFEFFE2     ",
+    "     2EFEFFE2     ",
+    "      2EFEFE2     ",
+    "       2EEFE2     ",
+    "        2EEE2     ",
+    "         2F2      ",
+    "          2       ",
+    "                  ",
+    "                  ",
+    "                  ",
+    "                  "
+  ],
+  "Explosion5": [
+    "          2       ",
+    "         2F2      ",
+    "        2EEE2     ",
+    "       2EEFE2     ",
+    "      2EFEFE2     ",
+    "     2EFEFFE2     ",
+    "    2EFEFFFE2     ",
+    "    2EFEFFFE2     ",
+    "    2EFEFFFE2     ",
+    "    2EFEFFFE2     ",
+    "    2EFEFFFE2     ",
+    "    2EFEFFFE2     ",
+    "    2EFEFFFE2     ",
+    "    2EFEFFFE2     ",
+    "    2EFEFFFE2     ",
+    "     2EFEFFE2     ",
+    "      2EFEFE2     ",
+    "       2EEFE2     ",
+    "        2EEE2     ",
+    "         2F2      ",
+    "          2       ",
+    "                  ",
+    "                  "
+  ],
+  "MOSTRO01": [
+    "                    ",
+    "      99FFFF99      ",
+    "     9FFFFFFFF9     ",
+    "    9FFFFFFFFFF9    ",
+    "   9FFFFFFFFFFFF9   ",
+    "   9FFFFFFFFFFFF9   ",
+    "  9FFFFFFFFFFFFFF9  ",
+    "  9FFFFFFFFFFFFFF9  ",
+    "  9F9FFFFFFFFF9FF9  ",
+    "  9FFFFFFFFFFFFFF9  ",
+    "  9FFFFFFFFFFFFFF9  ",
+    "  9FFFFFFFFFFFFFF9  ",
+    "   9F99FFFFFF99F9   ",
+    "   9F9 9FFFF9 9F9   ",
+    "   9F9  9FF9  9F9   ",
+    "    9    99    9    ",
+    "    9          9    ",
+    "  9F9          9F9  ",
+    "  9F9          9F9  ",
+    "  9F9          9F9  ",
+    "                    "
+  ],
+  "MOSTRO02": [
+    "                    ",
+    "      99FFFF99      ",
+    "     9FFFFFFFF9     ",
+    "    9FFFFFFFFFF9    ",
+    "   9FFFFFFFFFFFF9   ",
+    "   9FFFFFFFFFFFF9   ",
+    "  9FFFFFFFFFFFFFF9  ",
+    "  9FFFFFFFFFFFFFF9  ",
+    "  9F9FFFFFFFFF9FF9  ",
+    "  9FFFFFFFFFFFFFF9  ",
+    "  9FFFFFFFFFFFFFF9  ",
+    "  9FFFFFFFFFFFFFF9  ",
+    "   9F99FFFFFF99F9   ",
+    "   9F9 9FFFF9 9F9   ",
+    "   9F9  9FF9  9F9   ",
+    "    9    99    9    ",
+    "    9          9    ",
+    "    9F9      9F9    ",
+    "    9F9      9F9    ",
+    "    9F9      9F9    ",
+    "                    "
+  ],
+  "MOSTRO11": [
+    "                    ",
+    "      77EEEE77      ",
+    "     7EEEEEEEE7     ",
+    "    7EEEEEEEEEE7    ",
+    "   7EEEEEEEEEEEE7   ",
+    "   7EEEEEEEEEEEE7   ",
+    "  7EEEEEEEEEEEEEE7  ",
+    "  7EEEEEEEEEEEEEE7  ",
+    "  7E7EEEEEEEE7EE7  ",
+    "  7EEEEEEEEEEEEEE7  ",
+    "  7EEEEEEEEEEEEEE7  ",
+    "  7EEEEEEEEEEEEEE7  ",
+    "   7E77EEEEEE77E7   ",
+    "   7E7 7EEEE7 7E7   ",
+    "   7E7  7EE7  7E7   ",
+    "    7    77    7    ",
+    "    7          7    ",
+    "  7E7          7E7  ",
+    "  7E7          7E7  ",
+    "  7E7          7E7  ",
+    "                    "
+  ],
+  "MOSTRO12": [
+    "                    ",
+    "      77EEEE77      ",
+    "     7EEEEEEEE7     ",
+    "    7EEEEEEEEEE7    ",
+    "   7EEEEEEEEEEEE7   ",
+    "   7EEEEEEEEEEEE7   ",
+    "  7EEEEEEEEEEEEEE7  ",
+    "  7EEEEEEEEEEEEEE7  ",
+    "  7E7EEEEEEEE7EE7  ",
+    "  7EEEEEEEEEEEEEE7  ",
+    "  7EEEEEEEEEEEEEE7  ",
+    "  7EEEEEEEEEEEEEE7  ",
+    "   7E77EEEEEE77E7   ",
+    "   7E7 7EEEE7 7E7   ",
+    "   7E7  7EE7  7E7   ",
+    "    7    77    7    ",
+    "    7          7    ",
+    "    7E7      7E7    ",
+    "    7E7      7E7    ",
+    "    7E7      7E7    ",
+    "                    "
+  ],
+  "MOSTRO21": [
+    "                    ",
+    "      66DDDD66      ",
+    "     6DDDDDDDD6     ",
+    "    6DDDDDDDDDD6    ",
+    "   6DDDDDDDDDDDD6   ",
+    "   6DDDDDDDDDDDD6   ",
+    "  6DDDDDDDDDDDDDD6  ",
+    "  6DDDDDDDDDDDDDD6  ",
+    "  6D6DDDDDDDDD6DD6  ",
+    "  6DDDDDDDDDDDDDD6  ",
+    "  6DDDDDDDDDDDDDD6  ",
+    "  6DDDDDDDDDDDDDD6  ",
+    "   6D66DDDDDD66D6   ",
+    "   6D6 6DDDD6 6D6   ",
+    "   6D6  6DD6  6D6   ",
+    "    6    66    6    ",
+    "    6          6    ",
+    "  6D6          6D6  ",
+    "  6D6          6D6  ",
+    "  6D6          6D6  ",
+    "                    "
+  ],
+  "MOSTRO22": [
+    "                    ",
+    "      66DDDD66      ",
+    "     6DDDDDDDD6     ",
+    "    6DDDDDDDDDD6    ",
+    "   6DDDDDDDDDDDD6   ",
+    "   6DDDDDDDDDDDD6   ",
+    "  6DDDDDDDDDDDDDD6  ",
+    "  6DDDDDDDDDDDDDD6  ",
+    "  6D6DDDDDDDDD6DD6  ",
+    "  6DDDDDDDDDDDDDD6  ",
+    "  6DDDDDDDDDDDDDD6  ",
+    "  6DDDDDDDDDDDDDD6  ",
+    "   6D66DDDDDD66D6   ",
+    "   6D6 6DDDD6 6D6   ",
+    "   6D6  6DD6  6D6   ",
+    "    6    66    6    ",
+    "    6          6    ",
+    "    6D6      6D6    ",
+    "    6D6      6D6    ",
+    "    6D6      6D6    ",
+    "                    "
+  ],
+  "MOSTRO31": [
+    "                    ",
+    "      55CCCC55      ",
+    "     5CCCCCCCC5     ",
+    "    5CCCCCCCCCC5    ",
+    "   5CCCCCCCCCCCC5   ",
+    "   5CCCCCCCCCCCC5   ",
+    "  5CCCCCCCCCCCCCC5  ",
+    "  5CCCCCCCCCCCCCC5  ",
+    "  5C5CCCCCCCC5CC5  ",
+    "  5CCCCCCCCCCCCCC5  ",
+    "  5CCCCCCCCCCCCCC5  ",
+    "  5CCCCCCCCCCCCCC5  ",
+    "   5C55CCCCCC55C5   ",
+    "   5C5 5CCCC5 5C5   ",
+    "   5C5  5CC5  5C5   ",
+    "    5    55    5    ",
+    "    5          5    ",
+    "  5C5          5C5  ",
+    "  5C5          5C5  ",
+    "  5C5          5C5  ",
+    "                    "
+  ],
+  "MOSTRO32": [
+    "                    ",
+    "      55CCCC55      ",
+    "     5CCCCCCCC5     ",
+    "    5CCCCCCCCCC5    ",
+    "   5CCCCCCCCCCCC5   ",
+    "   5CCCCCCCCCCCC5   ",
+    "  5CCCCCCCCCCCCCC5  ",
+    "  5CCCCCCCCCCCCCC5  ",
+    "  5C5CCCCCCCC5CC5  ",
+    "  5CCCCCCCCCCCCCC5  ",
+    "  5CCCCCCCCCCCCCC5  ",
+    "  5CCCCCCCCCCCCCC5  ",
+    "   5C55CCCCCC55C5   ",
+    "   5C5 5CCCC5 5C5   ",
+    "   5C5  5CC5  5C5   ",
+    "    5    55    5    ",
+    "    5          5    ",
+    "    5C5      5C5    ",
+    "    5C5      5C5    ",
+    "    5C5      5C5    ",
+    "                    "
+  ],
+  "UFO01": [
+    "           88888         ",
+    "        88FFFFF88        ",
+    "      8FFFFFFFFFF8       ",
+    "     8FFFFFFFFFFFF8      ",
+    "    8FFFFFFFFFFFFFF8     ",
+    "   8FFFFFFFFFFFFFFFF8    ",
+    "   8FFFFFFFFFFFFFFFF8    ",
+    "  8FFFFFFFFFFFFFFFFFF8   ",
+    "  8FFFFFFFFFFFFFFFFFF8   ",
+    " 8FFFFFFFFFFFFFFFFFFFF8  ",
+    " 8FFFFFFFFFFFFFFFFFFFF8  ",
+    " 8FFFFFFFFFFFFFFFFFFFF8  ",
+    " 8FFFFFFFFFFFFFFFFFFFF8  ",
+    "  8FFFFFFFFFFFFFFFFFF8   ",
+    "  8FFFFFFFFFFFFFFFFFF8   ",
+    "   8FFFFF8888FFFFF8      ",
+    "    88888    88888       "
+  ],
+  "UFO02": [
+    "           88888         ",
+    "        88FFFFF88        ",
+    "      8FFFFFFFFFF8       ",
+    "     8FFFFFFFFFFFF8      ",
+    "    8FFFFFFFFFFFFFF8     ",
+    "   8FFFFFFFFFFFFFFFF8    ",
+    "   8FFFFFFFFFFFFFFFF8    ",
+    "  8FFFFFFFFFFFFFFFFFF8   ",
+    "  8FFFFFFFFFFFFFFFFFF8   ",
+    " 8FFFFFFFFFFFFFFFFFFFF8  ",
+    " 8FFFFFFFFFFFFFFFFFFFF8  ",
+    " 8FFFFFFFFFFFFFFFFFFFF8  ",
+    " 8FFFFFFFFFFFFFFFFFFFF8  ",
+    "  8FFFFFFFFFFFFFFFFFF8   ",
+    "  8FFFFFFFFFFFFFFFFFF8   ",
+    "   8FFFFF8888FFFFF8      ",
+    "    88888    88888       "
+  ],
+  "UFO11": [
+    "           99999         ",
+    "        99FFFFF99        ",
+    "      9FFFFFFFFFF9       ",
+    "     9FFFFFFFFFFFF9      ",
+    "    9FFFFFFFFFFFFFF9     ",
+    "   9FFFFFFFFFFFFFFFF9    ",
+    "   9FFFFFFFFFFFFFFFF9    ",
+    "  9FFFFFFFFFFFFFFFFFF9   ",
+    "  9FFFFFFFFFFFFFFFFFF9   ",
+    " 9FFFFFFFFFFFFFFFFFFFF9  ",
+    " 9FFFFFFFFFFFFFFFFFFFF9  ",
+    " 9FFFFFFFFFFFFFFFFFFFF9  ",
+    " 9FFFFFFFFFFFFFFFFFFFF9  ",
+    "  9FFFFFFFFFFFFFFFFFF9   ",
+    "  9FFFFFFFFFFFFFFFFFF9   ",
+    "   9FFFFF9999FFFFF9      ",
+    "    99999    99999       "
+  ],
+  "UFO12": [
+    "           99999         ",
+    "        99FFFFF99        ",
+    "      9FFFFFFFFFF9       ",
+    "     9FFFFFFFFFFFF9      ",
+    "    9FFFFFFFFFFFFFF9     ",
+    "   9FFFFFFFFFFFFFFFF9    ",
+    "   9FFFFFFFFFFFFFFFF9    ",
+    "  9FFFFFFFFFFFFFFFFFF9   ",
+    "  9FFFFFFFFFFFFFFFFFF9   ",
+    " 9FFFFFFFFFFFFFFFFFFFF9  ",
+    " 9FFFFFFFFFFFFFFFFFFFF9  ",
+    " 9FFFFFFFFFFFFFFFFFFFF9  ",
+    " 9FFFFFFFFFFFFFFFFFFFF9  ",
+    "  9FFFFFFFFFFFFFFFFFF9   ",
+    "  9FFFFFFFFFFFFFFFFFF9   ",
+    "   9FFFFF9999FFFFF9      ",
+    "    99999    99999       "
+  ],
+  "Ufo0Bum": [
+    "           88888         ",
+    "        88FFFFF88        ",
+    "      8FFEEEFFF8         ",
+    "     8FEEEEEFFF8         ",
+    "    8FEEEEEEFFF8         ",
+    "   8FEEEFFFFF8           ",
+    "   8FFFFF88888           ",
+    "  8FFF8888               ",
+    "  8F888                  ",
+    " 888                     ",
+    " 88                      ",
+    " 88                      ",
+    " 88                      ",
+    "  88                     ",
+    "  88                     ",
+    "   88                    ",
+    "    88                   "
+  ],
+  "Ufo1Bum": [
+    "           99999         ",
+    "        99FFFFF99        ",
+    "      9FFEEEFFF9         ",
+    "     9FEEEEEFFF9         ",
+    "    9FEEEEEEFFF9         ",
+    "   9FEEEFFFFF9           ",
+    "   9FFFFF99999           ",
+    "  9FFF9999               ",
+    "  9F999                  ",
+    " 999                     ",
+    " 99                      ",
+    " 99                      ",
+    " 99                      ",
+    "  99                     ",
+    "  99                     ",
+    "   99                    ",
+    "    99                   "
+  ],
+  "PLAYER1": [
+    "           44           ",
+    "          4444          ",
+    "         444444         ",
+    "        44444444        ",
+    "       4444444444       ",
+    "      444444444444      ",
+    "      444444444444      ",
+    "     44444444444444     ",
+    "    4444444444444444    ",
+    "    4444444444444444    ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    " 4444444444444444444444 ",
+    " 4444444444444444444444 ",
+    "444444444444444444444444",
+    "444444444444444444444444",
+    "444444444444444444444444"
+  ],
+  "PLAYER2": [
+    "           44           ",
+    "          4444          ",
+    "         444444         ",
+    "        44444444        ",
+    "       4444444444       ",
+    "      444444444444      ",
+    "      444444444444      ",
+    "     44444444444444     ",
+    "    4444444444444444    ",
+    "    4444444444444444    ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    " 4444444444444444444444 ",
+    " 4444444444444444444444 ",
+    "444444444444444444444444",
+    "444444444444444444444444",
+    "444444444444444444444444"
+  ],
+  "PLAYER3": [
+    "           44           ",
+    "          4444          ",
+    "         444444         ",
+    "        44444444        ",
+    "       4444444444       ",
+    "      444444444444      ",
+    "      444444444444      ",
+    "     44444444444444     ",
+    "    4444444444444444    ",
+    "    4444444444444444    ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    " 4444444444444444444444 ",
+    " 4444444444444444444444 ",
+    "444444444444444444444444",
+    "444444444444444444444444",
+    "444444444444444444444444"
+  ],
+  "PLAYER4": [
+    "           44           ",
+    "          4444          ",
+    "         444444         ",
+    "        44444444        ",
+    "       4444444444       ",
+    "      444444444444      ",
+    "      444444444444      ",
+    "     44444444444444     ",
+    "    4444444444444444    ",
+    "    4444444444444444    ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    " 4444444444444444444444 ",
+    " 4444444444444444444444 ",
+    "444444444444444444444444",
+    "444444444444444444444444",
+    "444444444444444444444444"
+  ],
+  "PLAYER5": [
+    "           44           ",
+    "          4444          ",
+    "         444444         ",
+    "        44444444        ",
+    "       4444444444       ",
+    "      444444444444      ",
+    "      444444444444      ",
+    "     44444444444444     ",
+    "    4444444444444444    ",
+    "    4444444444444444    ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    " 4444444444444444444444 ",
+    " 4444444444444444444444 ",
+    "444444444444444444444444",
+    "444444444444444444444444",
+    "444444444444444444444444"
+  ],
+  "PLAYER6": [
+    "           44           ",
+    "          4444          ",
+    "         444444         ",
+    "        44444444        ",
+    "       4444444444       ",
+    "      444444444444      ",
+    "      444444444444      ",
+    "     44444444444444     ",
+    "    4444444444444444    ",
+    "    4444444444444444    ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "   444444444444444444   ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    "  44444444444444444444  ",
+    " 4444444444444444444444 ",
+    " 4444444444444444444444 ",
+    "444444444444444444444444",
+    "444444444444444444444444",
+    "444444444444444444444444"
+  ],
+  "PSparo": [
+    "2",
+    "2",
+    "2",
+    "2",
+    "2",
+    "2",
+    "2"
+  ],
+  "MSparo": [
+    " F ",
+    " F ",
+    " F ",
+    " F "
+  ],
+  "MAstro": [
+    "    7777777777777    ",
+    "   7FFFFFFFFFFFFF7   ",
+    "  7FFFFFFFFFFFFFFF7  ",
+    " 7FFFFFFFFFFFFFFFFF7 ",
+    " 7FFFFFFFFFFFFFFFFF7 ",
+    " 7FFFFFFFFFFFFFFFFF7 ",
+    "  7FFFFFFFFFFFFFFF7  "
+  ],
+  "PAC1": [
+    "         EEEE          ",
+    "      EEEEEEEEEE       ",
+    "    EEEEEEEEEEEEEE     ",
+    "   EEEEEEEEEEEEEEEE    ",
+    "   EEEEEEEEEEEEEEEE    ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "   EEEEEEEEEEEEEEEE    "
+  ],
+  "PAC2": [
+    "         EEEE          ",
+    "      EEEEEEEEEE       ",
+    "    EEEEEEEEEEEEEE     ",
+    "   EEEEEEEEEEEEEEEE    ",
+    "   EEEEEEEEEEEEEEEE    ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "   EEEEEEEEEEEEEEEE    "
+  ],
+  "Pac3": [
+    "         EEEE          ",
+    "      EEEEEEEEEE       ",
+    "    EEEEEEEEEEEEEE     ",
+    "   EEEEEEEEEEEEEEEE    ",
+    "   EEEEEEEEEEEEEEEE    ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "   EEEEEEEEEEEEEEEE    "
+  ],
+  "PAC4": [
+    "         EEEE          ",
+    "      EEEEEEEEEE       ",
+    "    EEEEEEEEEEEEEE     ",
+    "   EEEEEEEEEEEEEEEE    ",
+    "   EEEEEEEEEEEEEEEE    ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "   EEEEEEEEEEEEEEEE    "
+  ],
+  "PAC5": [
+    "         EEEE          ",
+    "      EEEEEEEEEE       ",
+    "    EEEEEEEEEEEEEE     ",
+    "   EEEEEEEEEEEEEEEE    ",
+    "   EEEEEEEEEEEEEEEE    ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "   EEEEEEEEEEEEEEEE    "
+  ],
+  "PAC6": [
+    "         EEEE          ",
+    "      EEEEEEEEEE       ",
+    "    EEEEEEEEEEEEEE     ",
+    "   EEEEEEEEEEEEEEEE    ",
+    "   EEEEEEEEEEEEEEEE    ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "   EEEEEEEEEEEEEEEE    "
+  ],
+  "Pac7": [
+    "         EEEE          ",
+    "      EEEEEEEEEE       ",
+    "    EEEEEEEEEEEEEE     ",
+    "   EEEEEEEEEEEEEEEE    ",
+    "   EEEEEEEEEEEEEEEE    ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEE11111111EEEEE    ",
+    "  EEEEEEEEEEEEEEEEEE   ",
+    "   EEEEEEEEEEEEEEEE    "
+  ],
+  "KEYS": [
+    "  555   5   5  5555   555  ",
+    " 5      5   5  5     5     ",
+    " 5      5   5  555   5     ",
+    "  555   5   5  5     5  55 ",
+    "     5   5 5   5     5   5 ",
+    "     5   5 5   5     5   5 ",
+    " 5555     5    5      555  ",
+    "                            ",
+    "  4444  4   4  4   4  4  4 ",
+    "  4     4   4  4  4   4 4  ",
+    "  4     4   4  444    44   ",
+    "  4     4   4  4  4   4 4  ",
+    "  4      4 4   4   4  4  4 ",
+    "  4444    4    4   4  4  4 ",
+    "                            ",
+    "                            "
+  ],
+  "Lives": [
+    " LL      III  VV  VV  EEEEE  SSSS ",
+    " L L      I   V V V   E     S     ",
+    " L  L     I   V V V   E      S    ",
+    " L  L     I   V V V   EEEE    S   ",
+    " L  L     I   V V V   E        S  ",
+    " L L      I    V V    E     S  S  ",
+    " LL      III    V     EEEEE  SSS  ",
+    "                                  ",
+    " 222222  222222  222222  222222   ",
+    " 222222  222222  222222  222222   ",
+    " 222222  222222  222222  222222   ",
+    " 222222  222222  222222  222222   ",
+    " 222222  222222  222222  222222   ",
+    " 222222  222222  222222  222222   "
+  ],
+  "author": [
+    "  AAA   PPPP          ",
+    " A   A  P   P   rrr   ",
+    " AAAAA  PPPP   r   r  ",
+    " A   A  P      r   r  ",
+    " A   A  P      rrrr   ",
+    "               r      ",
+    "               r      "
+  ],
+  "DisePz": [],
+  "GestERR": [],
+  "SpaRaz": [],
+  "SpaUfo": [],
+  "SparaBomba": [],
+  "StartPresentazione": [],
+  "sparato": []
+};
+
+// Converte righe DATA in sprite {width,height,pixels}
+function buildSprite(lines) {
+  const height = lines.length;
+  const width = lines.reduce((max, line) => Math.max(max, line.length), 0);
+  const pixels = new Array(height);
+
+  for (let y = 0; y < height; y++) {
+    const line = lines[y] || "";
+    const row = new Array(width);
+    for (let x = 0; x < width; x++) {
+      const ch = line[x] || " ";
+      let c;
+      if (ch === " " || ch === ".") {
+        c = 0; // trasparente/nero
+      } else {
+        const n = parseInt(ch, 16);
+        c = Number.isNaN(n) ? 0 : n;
+      }
+      row[x] = c;
+    }
+    pixels[y] = row;
+  }
+  return { width, height, pixels };
+}
+
+const sprites = {};
+for (const name in spriteSources) {
+  sprites[name] = buildSprite(spriteSources[name]);
+}
+
+// ====== Canvas + buffer ======
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const WIDTH = canvas.width;
+const HEIGHT = canvas.height;
+
+// scala il canvas per essere visibile su monitor moderni
+const SCALE = 3;
+canvas.style.width = (WIDTH * SCALE) + "px";
+canvas.style.height = (HEIGHT * SCALE) + "px";
+
+const imageData = ctx.createImageData(WIDTH, HEIGHT);
+
+function hexToRgb(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function clearScreen(colorIndex = 0) {
+  const [r, g, b] = hexToRgb(palette[colorIndex] || "#000000");
+  for (let i = 0; i < imageData.data.length; i += 4) {
+    imageData.data[i] = r;
+    imageData.data[i + 1] = g;
+    imageData.data[i + 2] = b;
+    imageData.data[i + 3] = 255;
+  }
+}
+
+function putPixel(x, y, colorIndex) {
+  if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return;
+  const [r, g, b] = hexToRgb(palette[colorIndex] || "#000000");
+  const idx = (y * WIDTH + x) * 4;
+  imageData.data[idx] = r;
+  imageData.data[idx + 1] = g;
+  imageData.data[idx + 2] = b;
+  imageData.data[idx + 3] = 255;
+}
+
+function drawSprite(sprite, x, y) {
+  const { width, height, pixels } = sprite;
+  for (let j = 0; j < height; j++) {
+    const row = pixels[j];
+    for (let i = 0; i < width; i++) {
+      const c = row[i];
+      if (c !== 0) {
+        putPixel(x + i, y + j, c);
+      }
+    }
+  }
+}
+
+// Disegna testo "bitmap" semplice - qui usiamo la 2D API sopra il buffer
+function drawText(x, y, text, colorIndex = 15) {
+  ctx.putImageData(imageData, 0, 0);
+  ctx.save();
+  ctx.fillStyle = palette[colorIndex] || "#FFFFFF";
+  ctx.font = "8px monospace";
+  ctx.textBaseline = "top";
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+// ====== Input ======
+const keys = {};
+const justPressed = {};
+
+window.addEventListener("keydown", (e) => {
+  if (!keys[e.code]) {
+    justPressed[e.code] = true;
+  }
+  keys[e.code] = true;
+});
+
+window.addEventListener("keyup", (e) => {
+  keys[e.code] = false;
+});
+
+// ====== Audio (beep stile SOUND/PLAY) ======
+let audioCtx = null;
+function ensureAudioCtx() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      audioCtx = new AC();
+    }
+  }
+}
+
+function playBeep(freq, durationSec) {
+  if (!state.soundOn) return;
+  ensureAudioCtx();
+  if (!audioCtx) return;
+  const ctxA = audioCtx;
+  const osc = ctxA.createOscillator();
+  const gain = ctxA.createGain();
+  osc.type = "square";
+  osc.frequency.value = freq;
+  gain.gain.value = 0.08;
+  osc.connect(gain);
+  gain.connect(ctxA.destination);
+  const now = ctxA.currentTime;
+  osc.start(now);
+  osc.stop(now + durationSec);
+}
+
+// Piccoli wrapper per i suoni di gioco
+function sndShoot() { playBeep(1200, 0.06); }
+function sndAlienShoot() { playBeep(600, 0.08); }
+function sndExplosion() { playBeep(200, 0.2); }
+function sndUfo() { playBeep(400, 0.4); }
+function sndExtraLife() { playBeep(900, 0.2); }
+
+// ====== Stato di gioco ======
+const state = {
+  mode: "intro", // intro, keys, playing, joke, gameover
+  level: 1,
+  lives: 3,
+  score: 0,
+  hiscore: 0,
+  soundOn: true,
+  slowMotion: false,
+
+  playerX: 150,
+  playerY: 170,
+  playerSpeed: 80,
+
+  playerShot: {
+    active: false,
+    x: 0,
+    y: 0,
+    vy: -170
+  },
+
+  aliens: [], // array di {row,col,alive}
+  alienOffsetX: 20,
+  alienOffsetY: 40,
+  alienDir: 1,
+  alienSpeed: 15,
+  alienStepDown: 8,
+
+  alienAnimTimer: 0,
+  alienAnimFrame: 0,
+
+  alienShots: [],
+  maxAlienShots: 4,
+
+  ufo: null, // {x,y,dir,speed,alive}
+
+  joke: {
+    level: 0,
+    timer: 0,
+    pacX: -40,
+    pacFrame: 0
+  }
+};
+
+const HS_KEY = "aldus_invasion_hiscore";
+try {
+  const stored = localStorage.getItem(HS_KEY);
+  if (stored) {
+    state.hiscore = parseInt(stored, 10) || 0;
+  }
+} catch (e) {
+  // storage non disponibile, ignora
+}
+
+function updateHiscore() {
+  if (state.score > state.hiscore) {
+    state.hiscore = state.score;
+    try {
+      localStorage.setItem(HS_KEY, String(state.hiscore));
+    } catch (e) {}
+  }
+}
+
+// ====== Setup livelli ======
+function createAlienGrid() {
+  state.aliens = [];
+  const rows = 5;
+  const cols = 10;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      state.aliens.push({ row: r, col: c, alive: true });
+    }
+  }
+}
+
+function aliensAliveCount() {
+  return state.aliens.reduce((acc, a) => acc + (a.alive ? 1 : 0), 0);
+}
+
+function setupLevel(level) {
+  state.level = level;
+  state.playerX = (WIDTH - (sprites.PLAYER1 ? sprites.PLAYER1.width : 20)) / 2;
+  state.playerY = 170;
+  state.playerShot.active = false;
+
+  createAlienGrid();
+  state.alienOffsetX = 20;
+  state.alienOffsetY = 40;
+  state.alienDir = 1;
+  state.alienAnimFrame = 0;
+  state.alienAnimTimer = 0;
+
+  // parametri di velocità più o meno compatibili coi vari livelli
+  state.alienSpeed = 10 + level * 6;
+  state.alienStepDown = 8 + level * 2;
+  state.maxAlienShots = Math.min(4, 2 + level);
+  state.alienShots.length = 0;
+  state.ufo = null;
+
+  state.joke.level = 0;
+  state.joke.timer = 0;
+}
+
+function startGame() {
+  state.score = 0;
+  state.lives = 3;
+  setupLevel(1);
+  state.mode = "playing";
+}
+
+// ====== Utilità collisioni ======
+function rectsOverlap(ax, ay, aw, ah, bx, by, bw, bh) {
+  return ax < bx + bw &&
+         ax + aw > bx &&
+         ay < by + bh &&
+         ay + ah > by;
+}
+
+// Restituisce sprite del mostro per riga + frame animazione
+function getAlienSprite(row, frame) {
+  const pairIndex = row % 4;
+  const f = frame % 2;
+  const names = [
+    ["MOSTRO01", "MOSTRO02"],
+    ["MOSTRO11", "MOSTRO12"],
+    ["MOSTRO21", "MOSTRO22"],
+    ["MOSTRO31", "MOSTRO32"]
+  ];
+  const name = names[pairIndex][f];
+  return sprites[name] || sprites["MOSTRO01"];
+}
+
+function getPlayerSprite(frame) {
+  const idx = frame % 6;
+  const names = ["PLAYER1","PLAYER2","PLAYER3","PLAYER4","PLAYER5","PLAYER6"];
+  const name = names[idx] || "PLAYER1";
+  return sprites[name];
+}
+
+function getUfoSprite(frame, variant) {
+  const f = frame % 2;
+  if (variant === 0) {
+    const name = f === 0 ? "UFO01" : "UFO02";
+    return sprites[name];
+  } else {
+    const name = f === 0 ? "UFO11" : "UFO12";
+    return sprites[name];
+  }
+}
+
+// ====== Gestione input "one-shot" ======
+function isJustPressed(code) {
+  return justPressed[code] === true;
+}
+
+function consumeJustPressed(code) {
+  if (justPressed[code]) delete justPressed[code];
+}
+
+// ====== Update modalità INTRO ======
+function updateIntro(dt) {
+  if (isJustPressed("KeyS")) {
+    state.soundOn = !state.soundOn;
+    consumeJustPressed("KeyS");
+  }
+  if (isJustPressed("KeyK")) {
+    state.mode = "keys";
+    consumeJustPressed("KeyK");
+  }
+  if (isJustPressed("Space") || isJustPressed("Enter")) {
+    startGame();
+    consumeJustPressed("Space");
+    consumeJustPressed("Enter");
+  }
+}
+
+function drawIntro() {
+  clearScreen(0);
+
+  // scritta titolo
+  ctx.putImageData(imageData, 0, 0);
+  ctx.save();
+  ctx.fillStyle = palette[14];
+  ctx.font = "bold 14px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("ALDUS INVASION", WIDTH / 2, 40);
+  ctx.fillStyle = palette[11];
+  ctx.font = "10px monospace";
+  ctx.fillText("Porting JavaScript 2025", WIDTH / 2, 60);
+  ctx.restore();
+
+  // autore: usiamo sprite "author" se presente
+  if (sprites["author"] && spriteSources["author"].length) {
+    drawSprite(sprites["author"], 10, 80);
+  }
+
+  // pulsante "premi spazio"
+  ctx.save();
+  ctx.fillStyle = palette[15];
+  ctx.font = "9px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("SPAZIO = INIZIA  ·  K = TASTI  ·  S = SUONO ON/OFF", WIDTH / 2, 130);
+  ctx.fillText("Basato sul sorgente BASIC originale di Aldo Prinzi (1994)", WIDTH / 2, 150);
+  ctx.restore();
+}
+
+// ====== Modalità KEYS (schermata comandi) ======
+function updateKeys(dt) {
+  if (isJustPressed("Escape") || isJustPressed("Space") || isJustPressed("Enter")) {
+    state.mode = "intro";
+    consumeJustPressed("Escape");
+    consumeJustPressed("Space");
+    consumeJustPressed("Enter");
+  }
+}
+
+function drawKeys() {
+  clearScreen(1); // blu
+
+  ctx.putImageData(imageData, 0, 0);
+  ctx.save();
+  ctx.fillStyle = palette[15];
+  ctx.font = "bold 12px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("TASTI DI GIOCO", WIDTH / 2, 20);
+
+  ctx.font = "9px monospace";
+  ctx.textAlign = "left";
+  const startY = 50;
+  const lineH = 14;
+  const lines = [
+    "FRECCIA SINISTRA : Muovi la navicella a sinistra",
+    "FRECCIA DESTRA   : Muovi la navicella a destra",
+    "SPAZIO / FRECCIA SU : Spara il razzo",
+    "P               : Pausa",
+    "S               : Suono ON/OFF",
+    "R               : Rallenty (gioco piu' lento)",
+    "ESC             : Esce al Game Over"
+  ];
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], 20, startY + i * lineH);
+  }
+
+  ctx.textAlign = "center";
+  ctx.fillText("Premi SPAZIO o ESC per tornare", WIDTH / 2, HEIGHT - 30);
+  ctx.restore();
+}
+
+// ====== Gestione LEVEL CLEAR -> intermezzi (JOKE) ======
+function startJoke(level) {
+  state.mode = "joke";
+  state.joke.level = level;
+  state.joke.timer = 0;
+  state.joke.pacX = - (sprites["PAC1"] ? sprites["PAC1"].width : 40);
+  state.joke.pacFrame = 0;
+}
+
+function updateJoke(dt) {
+  state.joke.timer += dt;
+  const frames = ["PAC1","PAC2","Pac3","PAC4","PAC5","PAC6","Pac7"];
+  if (state.joke.timer > 0.12) {
+    state.joke.timer = 0;
+    state.joke.pacFrame = (state.joke.pacFrame + 1) % frames.length;
+    state.joke.pacX += 10; // scorrimento costante
+    if (state.joke.pacX > WIDTH + 10) {
+      // intermezzo finito: passa al livello successivo
+      const nextLevel = state.level + 1;
+      if (nextLevel <= 5) {
+        setupLevel(nextLevel);
+        state.mode = "playing";
+      } else {
+        // hai finito il gioco!
+        updateHiscore();
+        state.mode = "gameover";
+      }
+    }
+  }
+
+  if (isJustPressed("Space") || isJustPressed("Enter")) {
+    // salta intermezzo
+    const nextLevel = state.level + 1;
+    if (nextLevel <= 5) {
+      setupLevel(nextLevel);
+      state.mode = "playing";
+    } else {
+      updateHiscore();
+      state.mode = "gameover";
+    }
+    consumeJustPressed("Space");
+    consumeJustPressed("Enter");
+  }
+}
+
+function drawJoke() {
+  clearScreen(0);
+  ctx.putImageData(imageData, 0, 0);
+  ctx.save();
+
+  ctx.fillStyle = palette[14];
+  ctx.font = "bold 12px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("INTERMEZZO", WIDTH / 2, 20);
+
+  ctx.fillStyle = palette[11];
+  ctx.font = "9px monospace";
+
+  let text = "";
+  if (state.level === 1) text = "Gli invasori si prendono una pausa...";
+  else if (state.level === 2) text = "Gli UFO discutono sul tuo punteggio...";
+  else if (state.level === 3) text = "Qualcuno sta mangiando gli alieni...";
+  else if (state.level === 4) text = "Ultimo livello in arrivo, preparati!";
+  else text = "Hai completato una fase!";
+
+  ctx.fillText(text, WIDTH / 2, 40);
+
+  // disegniamo Pac che attraversa lo schermo
+  const frames = ["PAC1","PAC2","Pac3","PAC4","PAC5","PAC6","Pac7"];
+  const name = frames[state.joke.pacFrame % frames.length];
+  const spr = sprites[name];
+  if (spr) {
+    drawSprite(spr, Math.round(state.joke.pacX), 120);
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+
+  ctx.fillStyle = palette[15];
+  ctx.font = "8px monospace";
+  ctx.fillText("Premi SPAZIO per saltare l'intermezzo", WIDTH / 2, HEIGHT - 20);
+  ctx.restore();
+}
+
+// ====== Gestione GAME OVER ======
+function updateGameOver(dt) {
+  if (isJustPressed("Space") || isJustPressed("Enter")) {
+    startGame();
+    consumeJustPressed("Space");
+    consumeJustPressed("Enter");
+  }
+  if (isJustPressed("Escape")) {
+    state.mode = "intro";
+    consumeJustPressed("Escape");
+  }
+}
+
+function drawGameOver() {
+  clearScreen(0);
+  ctx.putImageData(imageData, 0, 0);
+
+  ctx.save();
+  ctx.fillStyle = palette[12];
+  ctx.font = "bold 14px monospace";
+  ctx.textAlign = "center";
+  ctx.fillText("GAME OVER", WIDTH / 2, 60);
+
+  ctx.fillStyle = palette[15];
+  ctx.font = "10px monospace";
+  ctx.fillText("Punteggio: " + state.score, WIDTH / 2, 90);
+  ctx.fillText("Record:    " + state.hiscore, WIDTH / 2, 105);
+
+  ctx.font = "9px monospace";
+  ctx.fillText("SPAZIO = Nuova partita · ESC = Titolo", WIDTH / 2, 130);
+  ctx.restore();
+}
+
+// ====== Gestione modalità PLAYING ======
+let playerAnimTimer = 0;
+let playerAnimFrame = 0;
+
+function handlePlayerInput(dt) {
+  let vx = 0;
+  if (keys["ArrowLeft"] || keys["KeyZ"]) vx -= state.playerSpeed;
+  if (keys["ArrowRight"] || keys["KeyX"]) vx += state.playerSpeed;
+  state.playerX += vx * dt;
+  if (state.playerX < 2) state.playerX = 2;
+  const playerSprite = getPlayerSprite(playerAnimFrame);
+  const maxX = WIDTH - (playerSprite ? playerSprite.width : 20) - 2;
+  if (state.playerX > maxX) state.playerX = maxX;
+
+  // sparo
+  if (!state.playerShot.active &&
+      (keys["Space"] || keys["ArrowUp"])) {
+    // crea razzo
+    const spr = getPlayerSprite(playerAnimFrame);
+    const px = state.playerX + (spr ? spr.width / 2 : 10);
+    state.playerShot.active = true;
+    state.playerShot.x = px - 1;
+    state.playerShot.y = state.playerY - 5;
+    sndShoot();
+  }
+}
+
+function updatePlayerShot(dt) {
+  if (!state.playerShot.active) return;
+  state.playerShot.y += state.playerShot.vy * dt;
+  if (state.playerShot.y < 0) {
+    state.playerShot.active = false;
+    return;
+  }
+
+  // collisione con UFO
+  if (state.ufo && state.ufo.alive) {
+    const sprUfo = getUfoSprite(0, state.ufo.variant);
+    const uw = sprUfo ? sprUfo.width : 30;
+    const uh = sprUfo ? sprUfo.height : 12;
+    if (rectsOverlap(
+      state.playerShot.x, state.playerShot.y, 2, 6,
+      state.ufo.x, state.ufo.y, uw, uh
+    )) {
+      sndExplosion();
+      state.score += 150;
+      state.playerShot.active = false;
+      state.ufo.alive = false;
+      state.ufo = null;
+      return;
+    }
+  }
+
+  // collisione con un alieno
+  const alienWidth = getAlienSprite(0, 0).width;
+  const alienHeight = getAlienSprite(0, 0).height;
+
+  for (const a of state.aliens) {
+    if (!a.alive) continue;
+    const spr = getAlienSprite(a.row, state.alienAnimFrame);
+    const ax = state.alienOffsetX + a.col * (alienWidth + 8);
+    const ay = state.alienOffsetY + a.row * (alienHeight + 4);
+
+    if (rectsOverlap(
+      state.playerShot.x, state.playerShot.y, 2, 6,
+      ax, ay, spr.width, spr.height
+    )) {
+      // colpito
+      a.alive = false;
+      state.playerShot.active = false;
+      sndExplosion();
+      state.score += 10 * (5 - a.row); // riga più alta -> più punti
+      // controlla se abbiamo finito
+      if (aliensAliveCount() === 0) {
+        updateHiscore();
+        if (state.level < 5) {
+          startJoke(state.level);
+        } else {
+          state.mode = "gameover";
+        }
+      }
+      return;
+    }
+  }
+}
+
+function updateAliens(dt) {
+  // movimento orizzontale e discesa
+  const spr0 = getAlienSprite(0, state.alienAnimFrame);
+  const aw = spr0.width;
+  const ah = spr0.height;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  for (const a of state.aliens) {
+    if (!a.alive) continue;
+    const ax = state.alienOffsetX + a.col * (aw + 8);
+    const ay = state.alienOffsetY + a.row * (ah + 4);
+    if (ax < minX) minX = ax;
+    if (ax + aw > maxX) maxX = ax + aw;
+    if (ay < minY) minY = ay;
+    if (ay + ah > maxY) maxY = ay + ah;
+  }
+
+  if (!Number.isFinite(minX)) {
+    // nessun alieno vivo (già trattato altrove)
+    return;
+  }
+
+  const marginLeft = 5;
+  const marginRight = WIDTH - 5;
+
+  let changeDir = false;
+  const dx = state.alienDir * state.alienSpeed * dt;
+
+  if (maxX + dx > marginRight || minX + dx < marginLeft) {
+    changeDir = true;
+  }
+
+  if (changeDir) {
+    state.alienDir *= -1;
+    state.alienOffsetY += state.alienStepDown;
+    maxY += state.alienStepDown;
+    // se gli alieni arrivano troppo in basso -> game over
+    if (maxY >= state.playerY - 10) {
+      // il giocatore viene invaso
+      state.lives = 0;
+      updateHiscore();
+      state.mode = "gameover";
+      return;
+    }
+  } else {
+    state.alienOffsetX += dx;
+  }
+
+  // animazione semplice: alterna frame ogni tot
+  state.alienAnimTimer += dt;
+  const animSpeed = state.slowMotion ? 0.4 : 0.25;
+  if (state.alienAnimTimer >= animSpeed) {
+    state.alienAnimTimer = 0;
+    state.alienAnimFrame = (state.alienAnimFrame + 1) % 2;
+  }
+
+  // spam degli spari alieni
+  const shotChance = state.slowMotion ? 0.02 : 0.04 + state.level * 0.01;
+  if (state.alienShots.length < state.maxAlienShots && Math.random() < shotChance) {
+    spawnAlienShot();
+  }
+}
+
+function spawnAlienShot() {
+  // scegli una colonna casuale che abbia almeno un alieno vivo
+  const aw = getAlienSprite(0, 0).width;
+  const ah = getAlienSprite(0, 0).height;
+  const cols = 10;
+
+  const colsWithAliens = [];
+  for (let c = 0; c < cols; c++) {
+    for (const a of state.aliens) {
+      if (a.col === c && a.alive) {
+        colsWithAliens.push(c);
+        break;
+      }
+    }
+  }
+  if (!colsWithAliens.length) return;
+  const col = colsWithAliens[Math.floor(Math.random() * colsWithAliens.length)];
+
+  // trova l'alieno più in basso in quella colonna
+  let chosenAlien = null;
+  for (const a of state.aliens) {
+    if (!a.alive || a.col !== col) continue;
+    if (!chosenAlien || a.row > chosenAlien.row) {
+      chosenAlien = a;
+    }
+  }
+  if (!chosenAlien) return;
+
+  const ax = state.alienOffsetX + chosenAlien.col * (aw + 8);
+  const ay = state.alienOffsetY + chosenAlien.row * (ah + 4);
+
+  state.alienShots.push({
+    x: ax + aw / 2,
+    y: ay + ah,
+    vy: 90 + state.level * 10
+  });
+  sndAlienShoot();
+}
+
+function updateAlienShots(dt) {
+  const sprPlayer = getPlayerSprite(playerAnimFrame);
+  const pw = sprPlayer ? sprPlayer.width : 18;
+  const ph = sprPlayer ? sprPlayer.height : 12;
+
+  const newShots = [];
+  for (const s of state.alienShots) {
+    const ny = s.y + s.vy * dt;
+    if (ny > HEIGHT) {
+      continue; // fuori dallo schermo
+    }
+    // controlla collisione col player
+    if (rectsOverlap(
+      s.x, ny, 2, 6,
+      state.playerX, state.playerY, pw, ph
+    )) {
+      sndExplosion();
+      state.lives -= 1;
+      if (state.lives <= 0) {
+        updateHiscore();
+        state.mode = "gameover";
+      } else {
+        // respawn semplice: rimetti il player al centro
+        state.playerX = (WIDTH - pw) / 2;
+        state.playerShot.active = false;
+      }
+      continue;
+    }
+
+    s.y = ny;
+    newShots.push(s);
+  }
+  state.alienShots = newShots;
+}
+
+function updateUfo(dt) {
+  if (!state.ufo) {
+    // probabilità di creare un UFO
+    const chance = state.slowMotion ? 0.002 : 0.004 + state.level * 0.002;
+    if (Math.random() < chance) {
+      const fromLeft = Math.random() < 0.5;
+      state.ufo = {
+        x: fromLeft ? -40 : WIDTH + 10,
+        y: 20,
+        dir: fromLeft ? 1 : -1,
+        speed: 40 + state.level * 10,
+        alive: true,
+        animFrame: 0,
+        animTimer: 0,
+        variant: Math.random() < 0.5 ? 0 : 1
+      };
+      sndUfo();
+    }
+  } else {
+    const u = state.ufo;
+    u.x += u.dir * u.speed * dt;
+    if (u.x < -60 || u.x > WIDTH + 60) {
+      state.ufo = null;
+      return;
+    }
+    u.animTimer += dt;
+    if (u.animTimer > 0.2) {
+      u.animTimer = 0;
+      u.animFrame = (u.animFrame + 1) % 2;
+    }
+  }
+}
+
+function updatePlaying(dt) {
+  if (isJustPressed("KeyP")) {
+    consumeJustPressed("KeyP");
+    // (Pausa "soft": potresti aggiungere una vera schermata pausa)
+  }
+  if (isJustPressed("KeyS")) {
+    state.soundOn = !state.soundOn;
+    consumeJustPressed("KeyS");
+  }
+  if (isJustPressed("KeyR")) {
+    state.slowMotion = !state.slowMotion;
+    consumeJustPressed("KeyR");
+  }
+
+  if (keys["Escape"]) {
+    updateHiscore();
+    state.mode = "gameover";
+    return;
+  }
+
+  let dtEffective = dt;
+  if (state.slowMotion) dtEffective *= 0.4;
+
+  handlePlayerInput(dtEffective);
+  updatePlayerShot(dtEffective);
+  updateAliens(dtEffective);
+  updateAlienShots(dtEffective);
+  updateUfo(dtEffective);
+
+  // aggiorna animazione player
+  playerAnimTimer += dtEffective;
+  if (playerAnimTimer > 0.12) {
+    playerAnimTimer = 0;
+    playerAnimFrame = (playerAnimFrame + 1) % 6;
+  }
+}
+
+function drawPlaying() {
+  clearScreen(0);
+
+  // disegna aliens
+  const aw = getAlienSprite(0, state.alienAnimFrame).width;
+  const ah = getAlienSprite(0, state.alienAnimFrame).height;
+
+  for (const a of state.aliens) {
+    if (!a.alive) continue;
+    const spr = getAlienSprite(a.row, state.alienAnimFrame);
+    const ax = Math.round(state.alienOffsetX + a.col * (aw + 8));
+    const ay = Math.round(state.alienOffsetY + a.row * (ah + 4));
+    drawSprite(spr, ax, ay);
+  }
+
+  // disegna ufo
+  if (state.ufo && state.ufo.alive) {
+    const sprUfo = getUfoSprite(state.ufo.animFrame, state.ufo.variant);
+    if (sprUfo) {
+      drawSprite(sprUfo, Math.round(state.ufo.x), state.ufo.y);
+    }
+  }
+
+  // disegna player
+  const sprPlayer = getPlayerSprite(playerAnimFrame);
+  if (sprPlayer) {
+    drawSprite(sprPlayer, Math.round(state.playerX), state.playerY);
+  }
+
+  // disegna sparo player
+  if (state.playerShot.active) {
+    const rz = sprites["Razzo"] || null;
+    if (rz) {
+      drawSprite(rz, Math.round(state.playerShot.x - rz.width / 2), Math.round(state.playerShot.y));
+    } else {
+      // fallback: una linea
+      for (let i = 0; i < 6; i++) {
+        putPixel(Math.round(state.playerShot.x), Math.round(state.playerShot.y + i), 15);
+      }
+    }
+  }
+
+  // spari alieni
+  for (const s of state.alienShots) {
+    const ms = sprites["MSparo"];
+    if (ms) {
+      drawSprite(ms, Math.round(s.x), Math.round(s.y));
+    } else {
+      for (let i = 0; i < 4; i++) {
+        putPixel(Math.round(s.x), Math.round(s.y + i), 12);
+      }
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+
+  // HUD
+  ctx.save();
+  ctx.fillStyle = palette[15];
+  ctx.font = "9px monospace";
+  ctx.textAlign = "left";
+  ctx.fillText("SCORE: " + state.score, 4, 4);
+  ctx.fillText("HI: " + state.hiscore, 4, 14);
+  ctx.fillText("LIVES: " + state.lives, 4, 24);
+  ctx.textAlign = "right";
+  ctx.fillText("LEVEL: " + state.level, WIDTH - 4, 4);
+  if (state.slowMotion) {
+    ctx.fillStyle = palette[14];
+    ctx.fillText("RALLENTY", WIDTH - 4, 24);
+  }
+  ctx.restore();
+}
+
+// ====== Main loop ======
+let lastTime = performance.now();
+
+function gameLoop(now) {
+  const dt = (now - lastTime) / 1000;
+  lastTime = now;
+
+  switch (state.mode) {
+    case "intro":
+      updateIntro(dt);
+      drawIntro();
+      break;
+    case "keys":
+      updateKeys(dt);
+      drawKeys();
+      break;
+    case "playing":
+      updatePlaying(dt);
+      drawPlaying();
+      break;
+    case "joke":
+      updateJoke(dt);
+      drawJoke();
+      break;
+    case "gameover":
+      updateGameOver(dt);
+      drawGameOver();
+      break;
+  }
+
+  // reset dei justPressed
+  for (const code in justPressed) {
+    delete justPressed[code];
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// Startup
+clearScreen(0);
+ctx.putImageData(imageData, 0, 0);
+requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>

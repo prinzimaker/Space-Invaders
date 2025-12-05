@@ -253,6 +253,14 @@ Aldus-Invasion/
 
 ---
 
+## Perchè due versioni?
+
+Nel 1994 stavo ultimando il mio programma per la informatizzazione della cartella clinica di una importante casa di cura di Palermo. Avevo scritto anche la procedura che veniva essere usata dal personale del centralino per conoscere la stanza da collegare quando un parente del paziente chiamava. 
+I centralinisti,al pari degli infermieri, erano costretti a fare i turni anche la notte. Per evitare che si addormentassero provai a creare diversi programmi per distrarli un po', e alla fine questo videogame diventò il loro passatempo: si sfidavano turno dopo turno per il posto di miglior giocatore. Sicchè diventò ufficialmente un _easter egg_ della "rubrica dei pazienti presenti" e fu riscritto in BC7.
+
+
+---
+
 ## 📜 Licenza
 
 Come indicato nel sorgente originale del 1994:

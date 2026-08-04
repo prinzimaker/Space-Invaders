@@ -1,0 +1,1070 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Aldus Invasion 1 — JavaScript HD Edition</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}html,body{height:100%;margin:0;background:#050505;color:#ddd;font-family:Consolas,"Courier New",monospace;overflow:hidden}body{display:grid;place-items:center}.shell{width:min(100vw,1100px);display:grid;place-items:center;gap:10px;padding:10px}.frame{position:relative;width:min(calc(100vw - 24px),960px);aspect-ratio:8/5;background:#000;border:2px solid #555;box-shadow:0 0 0 2px #111,0 12px 40px #000;line-height:0;overflow:hidden}.frame canvas{position:absolute;inset:0;display:block;width:100%;height:100%;background:transparent}#game{image-rendering:pixelated;image-rendering:crisp-edges;background:#000}#textLayer{pointer-events:none}.bar{width:min(calc(100vw - 24px),960px);display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;line-height:1.3;color:#aaa}.commands{text-align:left}.actions{display:flex;gap:7px;white-space:nowrap}button{font:inherit;color:#ddd;background:#171717;border:1px solid #555;padding:6px 10px;cursor:pointer}button:hover{background:#252525}button:focus-visible{outline:2px solid #fff}.touch{display:none;width:min(calc(100vw - 24px),960px);grid-template-columns:1fr 1fr 1.3fr;gap:10px}.touch button{min-height:48px;font-size:18px;touch-action:none}@media(pointer:coarse),(max-width:700px){.bar{font-size:10px}.touch{display:grid}.commands{max-width:70%}}.badge{position:absolute;right:5px;bottom:5px;color:#777;font-size:8px;line-height:1;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="frame"><canvas id="game" width="320" height="200" aria-label="Aldus Invasion"></canvas><canvas id="textLayer" width="960" height="600" aria-hidden="true"></canvas><span class="badge">SPRITE 320×200 · TESTO HD</span></div>
+  <div class="bar"><div class="commands">← → muovi · SPAZIO/↑ spara · P pausa · S suono · V velocità · R rallenty</div><div class="actions"><button id="speedBtn">VELOCITÀ: NORMALE</button><button id="soundBtn">SUONO: ON</button><button id="fullBtn">SCHERMO INTERO</button></div></div>
+  <div class="touch"><button data-key="ArrowLeft">◀</button><button data-key="ArrowRight">▶</button><button data-key="Space">FUOCO</button></div>
+</div>
+<script>
+'use strict';
+const ASSETS={"razzo":[["00000000400000000","00000000400000000","00000000400000000","00000004140000000","00000004140000000","00000041314000000","00000413731400000","00004133373140000","00004133373140000","00004113331140000","00004111111140000","00004411111440000","00002444244420000","00002111211120000","00022111211122000","00022111211122000","00022111211122000","00222555255522200","00222200200222200","00222000200022200","02220000200002220","02200000200000220","02000000200000020","00000000000000000"],["00000000400000000","00000000400000000","00000000400000000","00000004140000000","00000004140000000","00000041314000000","00000413731400000","00004133373140000","00004133373140000","00004113331140000","00004111111140000","00004411111440000","00002444244420000","00002111211120000","00022111211122000","00022111211122000","00022111211122000","00222555255522200","002222FF2FE222200","00222EEF2FE622200","02226EEE26EE62220","02226EEE26EE62220","020006DE2E6E00020","000060D6ED6000000","000000066E0600000","0000000060E000000"],["00000000400000000","00000000400000000","00000000400000000","00000004140000000","00000004140000000","00000041314000000","00000413731400000","00004133373140000","00004133373140000","00004113331140000","00004111111140000","00004411111440000","00002444244420000","00002111211120000","00022111211122000","00022111211122000","00022111211122000","00222555255522200","002222EF2FF222200","00222EEF2FE622200","022266EE26EE62220","0220E6EE2EE660220","0200E6DF2E6600020","00000DDFED6000000","0000E0E6600000000","000000E0000000000"]],"explosion":[["00000000000000000","0000E000000000000","00000000B00000000","00000004F4000E000","00000004140000000","000E00413B4000000","0400EE137EB4E0E00","00404E3E3DEB4E000","00404BE3EDDEE0400","00E0EEEEEEE1400E0","000E4BFEEEEE40440","000E44BEEEE4440E0","0004F44EEE442000E","00E421EEE1E124000","00422EB14FE1220E0","0E42EEE12444EEE00","40E2FF1BB11E22000","002E25DDDE544EE00","0422E2002EE444204","002D2000200044440","0244E0E0EE0002220","0D440000400004440","02000000200000020"],["00000000000000000","0000E000000040000","00000000040000000","00E0000400000E000","000000441E0400600","40000441DB4406000","0000EE1EEEE4E0E00","00044EDEDDEB4E040","04044BEEEDDEE660E","0000EEEDDDE14E000","0E0E4BFEDEEEEE440","004E4FFEDDE444000","0044FFFDDED4660E0","00E441EDEDE144600","004EEEE1EFE1EE000","0E42EEE16444EEE00","00EEFF1BB11E66000","004E25DDDE544EE00","0422E4044EE444204","004D4004440044440","0E44E0E0EE0004440","0D440E00440004440","04000000400000040"],["00000000000000000","00000000000000000","00E00000000600000","0000000000000E000","000006F0000400600","00000006E00006000","0000EE1E6666E0E00","00046E8ED8884E000","00046BEE8D8EE6608","0000EFFD88E14E000","000E4B68088EEE440","00444F688DE444000","0064666DF8DE66000","00E440DDEDE1E4600","006EFF61E8DE4E000","0E62E6616E0D6EE00","00EEFF1B011D86000","006E25DDDE5448E00","0622E4F044E444200","004D4444444468440","0E66E0E0EE6408840","0D440E06040604640","04006000406004440"],["00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000600000000000","00000000000000000","0000E00D000000000","00040000088000000","0000000E8D8EE0608","000004FD88E140000","00004B68888EEE000","00004F688DE440000","0000666008DE66000","00044D88E8E1E0000","000E448888DE4E000","0000E66880DD6E000","0000448B086D86000","006E65486E8648800","0002E464648488280","004D4466646468880","0E86E888608468880","0D488866848688888","88886866886884448"],["00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000004","00000000000000000","00000088080100000","0000008888D040000","0000066888DD6E000","00004480886D86880","006E6868648068888","00886464608408688","00864460668686888","0886E0686E8060686","88488868068680888","88686866886080668"],["00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","00000000000000000","006E6000048008088","00806000088008088","08884060068080888","88867080080606808","88888880868088088","88686868886888668"]],"alien":[[["0000000000000000","0055002222200550","0000522222225000","0022222282222220","0022270722270720","0022222282222220","0022323282323220","0000333363333000","0000033360333000","0003330060033300","0333000000333000"],["0000000000000000","0500022202220005","0055522222225550","0022222282222220","0027072227072220","0022222282222220","0002323838323200","0000333343333000","0000333043330000","0003330000033300","0000333000000333"]],[["0000000000000000","0000000066600000","0000006633366000","0055663E333E3665","0055663E333E3665","0000066333336600","0000066333336600","0000003631363000","0000660066006600","0006600660066000","0066006600660000"],["0000000000000000","0000006660000000","0000663336600000","55663E333E366550","55663E333E366550","0006633333660000","0006633333660000","0000363136300000","0006600660066000","0000660066006600","0000066006600660"]],[["0000000000000000","0066000000000660","0000603555306000","0000355555553000","0035775555775530","0355555555555553","0355555333555553","0035555555555530","0000500050005000","0005000050000500","0000550000055000"],["0000000000000000","0000000060000000","0006603555306600","0060355555553060","0035577555577530","0355555535555553","0355555333555553","0035555535555530","0005500050005500","0050000050000050","0550000505000055"]],[["0000000000000000","0000000555055500","0770005777500000","0070177777771000","00777E477E477770","0000177777771070","0000177444771077","0000007777700000","0000077000770000","0000770000077000","0777700000777700"],["0000000000000000","0005550555000000","0000005777500077","0000377777773070","0077774E774E7770","0070377777773000","0770377747773000","0000007777700000","0000077000770000","0000770000077000","0007777000007777"]],[["0000000000000000","0640000000000046","0004441111144400","0000111111111000","0001733173311100","0001111111111100","0011111111111110","0011111EEE111110","0001111111111100","0001100000110000","0001111000111100"],["0000000000000000","0000000000000000","0000041111140000","0004411111114400","0060113371337060","0011111111111110","0111111111111111","0111111E1E111111","00111111E1111110","0000110000011000","0001111000111100"]]],"player":[["000000000","000063300","000066630","000006000","000067600","000066700","000766670","000066000","000066000","000060660","000660060"],["000000000","000063330","000066630","000006000","000067600","000066770","000066600","000066000","000066600","060600066","006000000"],["000000000","000063300","000066630","000006000","000067600","000066700","000067670","000066000","000066000","000006600","000066600"],["0000000000000000000","00000000000E4404400","0000000000E4F4F4000","0000000000E4FFF4000","000002200E4F4F44000","0000DD220E4FF440000","00000D00E4F44400000","00002727E7400000000","0000227700000000000","0007222000000000000","0000550000000000000","0000550000000000000","0000505500000000000","0005500500000000000","0000000000000000000"],["0000000000000000000","00000000000E4444400","00000000000E4FFF400","0000000000E4F4F4400","0000D22200E4FFF4400","0000DD220E4F4444000","00000D000E444440000","000027207E700000000","0000227700000000000","0000222000000000000","0000550000000000000","0000555000000000000","0505000550000000000","0050000000000000000","0000000000000000000"],["0000000000000000000","0000000000E44444000","0000000000E4FFF4000","0000000000E4F4F4400","0000D2200E4FFF44000","0000DD220E4F4444000","00000D000E444440000","00002727E7000000000","0000227000000000000","0000222700000000000","0000550000000000000","0000550000000000000","0000055000000000000","0000555000000000000","0000000000000000000"]],"shot":["000","0D0","D4D","040","040","040","040","333","3E3"],"enemyShot":["000","5E5","555","050","050","0F0"],"ufo":[[["0000000000000000000000000000","0000000000066660000000000000","0000000000600006000000000000","0000006E66666666666E60000000","0066666336666666663366660000","0644443333444444433334446000","0066666336666666663366660000","0006666666646646666666600000","0000000000468864000000000000"],["0000000000000000000000000000","0000000000066660000000000000","00000000006BBBB6000000000000","0000006866666666666860000000","0066666336666666663366660000","0644443333444444433334446000","0066666336666666663366660000","0006666666646646666666600000","0000000004661166400000000000"],["0000000000000000000000000000","00000FFFF0044440000000000000","0000FF00FF44FFFF000000000000","0000004FF44FF44FF44FFFF00000","004444FF444FF44FF4FF44FF0000","04444FF4444FF44FF4FF44FF4000","0044FFFFFF4FF44FF4FF44FF0000","000444444444FFFF44FF44FF0000","0000000004444444400FFFF00000"]],[["0000000000000000000000000000","0000000000008800000000000000","0000000022222222220000000000","0000002200022200022200000000","2222222200022200022222222200","0006444777444777444777600000","222EE2222222222222222EE22200","0000000000222222000000000000","0000002222200002222200000000"],["0000000000000000000000000000","000000000000EE00000000000000","0000000022222222220000000000","0000002200022200022200000000","2222222200022200022222222200","0006777444777444777444600000","2228822222222222222228822200","0000000000222222000000000000","0000002222200002222200000000"],["0000000000000000000000000000","0000000000008800000000000000","00000000888888888EEEE0000000","000000888EEEEEE8EE88EE000000","888EEEE88EE88888EE88EE888800","00EE88EE88EEEE88EE88EE800000","88888EE888888EE88EEEE8888800","00EE00EE0EEEEE88000000000000","000EEEE888800008888800000000"]]],"pac":[["00000000000000000000","00000000EEEE00000000","00000EEEEEEEEEE00000","000EEEEEEEEEEEEEE000","00EEEEEEEEEEEEEEEE00","00EEEEEEEEEEEEEEEE00","0EEEEEEEEEEEEEEEEEE0","0000000000EEEEEEEEE0","0EEEEEEEEEEEEEEEEEE0","00EEEEEEEEEEEEEEEE00","00EEEEEEEEEEEEEEEE00","000EEEEEEEEEEEEEE000","00000EEEEEEEEEE00000","00000000EEEE00000000"],["000000000000000000000","000000000EEEE00000000","000000EEEEEEEEEE00000","0000EEEEEEEEEEEEEE000","000EEEEEEEEEEEEEEEE00","00000EEEEEEEEEEEEEE00","000000000EEEEEEEEEEE0","00000000000EEEEEEEEE0","000000000EEEEEEEEEEE0","00000EEEEEEEEEEEEEE00","000EEEEEEEEEEEEEEEE00","0000EEEEEEEEEEEEEE000","000000EEEEEEEEEE00000","000000000EEEE00000000"],["000000000000000000000","000000000EEEE00000000","000000EEEEEEEEEE00000","0000EEEEEEEEEEEEEE000","00000EEEEEEEEEEEEEE00","0000000EEEEEEEEEEEE00","000000000EEEEEEEEEEE0","00000000000EEEEEEEEE0","000000000EEEEEEEEEEE0","0000000EEEEEEEEEEEE00","00000EEEEEEEEEEEEEE00","0000EEEEEEEEEEEEEE000","000000EEEEEEEEEE00000","000000000EEEE00000000"],["00000000000000000","00000077777000000","00007777777770000","00777777777777700","07770777777707770","07700077777000770","07770777777707770","07777777777777770","07777070707077770","07770707070707770","07777777777777770","00777707777077770","00077000770007700"],["0000000000000000","0000007777700000","0000777777777000","0077777777777770","0777077777770777","0770007777700077","0777077777770777","0777777777777777","0777707070707777","0777070707070777","0777777777777777","0777077770777700","0770007700077000"],["0000000000000000","0000004444400000","0000444444444000","0044444444444440","044FFF44444FFF44","044FF044444FF044","044FFF44444FFF44","0444444444444444","0444444444444444","0444444444444444","0444444444444444","0444044440444400","0440004400044000"],["0000000000000000","0000004444400000","0000444444444000","0044444444444440","044FFF44444FFF44","044FF044444FF044","044FFF44444FFF44","0444444444444444","0444444444444444","0444444444444444","0444444444444444","0044440444404444","0004400044000440"],["00000000000000000000","00000000EEEE00000000","00000EEEEEEEEEE00000","000EEEEEEEEEEEEEE000","00EEEEEEEEEEEEEEEE00","00EEEEEEEEEEEEEEEE00","0EEEEEEEEEEEEEEEEEE0","0EEEEEEEEE0000000000","0EEEEEEEEEEEEEEEEEE0","00EEEEEEEEEEEEEEEE00","00EEEEEEEEEEEEEEEE00","000EEEEEEEEEEEEEE000","00000EEEEEEEEEE00000","00000000EEEE00000000"],["000000000000000000000","000000000EEEE00000000","000000EEEEEEEEEE00000","0000EEEEEEEEEEEEEE000","000EEEEEEEEEEEEEEEE00","000EEEEEEEEEEEEEE0000","00EEEEEEEEEEE00000000","00EEEEEEEEE0000000000","00EEEEEEEEEEE00000000","000EEEEEEEEEEEEEE0000","000EEEEEEEEEEEEEEEE00","0000EEEEEEEEEEEEEE000","000000EEEEEEEEEE00000","000000000EEEE00000000"],["000000000000000000000","000000000EEEE00000000","000000EEEEEEEEEE00000","0000EEEEEEEEEEEEEE000","000EEEEEEEEEEEEEE0000","000EEEEEEEEEEEE000000","00EEEEEEEEEEE00000000","00EEEEEEEEE0000000000","00EEEEEEEEEEE00000000","000EEEEEEEEEEEE000000","000EEEEEEEEEEEEEE0000","0000EEEEEEEEEEEEEE000","000000EEEEEEEEEE00000","000000000EEEE00000000"]],"miniShip":["   4   ","  414  ","  111  ","  111  ","  222  "," 2 2 2 "," 2 2 2 "],"keys":["88888                                                                           8                                                                               8                                                  888888","88888  7  7  77777 7   7  7777       3   3  333  3   3 33333     4         4    8  3333   333  3   3  3333 33333    333  3   3      333  33333 33333     4444   8  33333 3   3 3333     3333  3333  3   3 33333    888888","88888  7 7   7      7 7  7      7    33 33 3   3 3   3 3     3  4           4   8  3   3 3   3 3   3 3     3       3   3 33  3   3 3   3 3     3      3  4   4  8  3     33  3 3   3   3     3    3 33 33 3     3  888888","88888  77    77777   7    777        3 3 3 3   3  3 3  3333    444444   444444  8  3   3 3   3 3   3  333  3333    3   3 3 3 3  3  3   3 3333  3333      4   4  8  3333  3 3 3 3   3   3  33 3    3 3 3 3 3333     888888","88888  7 7   7       7       7  7    3   3 3   3  3 3  3     3  4           4   8  3333  33333 3   3     3 3       3   3 3  33 3   3   3 3     3      3  4444   8  3     3  33 3   3   3   3 333333 3   3 3     3  888888","88888  7  7  77777   7   7777        3   3  333    3   33333     4         4    8  3     3   3  333  3333  33333    333  3   3      333  3     3         4      8  33333 3   3 3333     333  3    3 3   3 33333    888888","88888                                                                           8                                                                               8                                                  888888","88888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888                                                  888888","88888                                                                           8                                                                               8                                                  888888","88888  33333 3 3333  33333     4                 4444 4444   444   444  44444   8   3333                       3    333  3   3      333  33333 33333      4444  8                44444  4444  444                  888888","88888  3     3 3   3 3     3  444    333  3 33  4     4   4 4   4 4   4 4       8  3      333  3   3 3 33   33 3   3   3 33  3   3 3   3 3     3      3  4      8                4     4     4   4                 888888","88888  3333  3 3   3 3333    4 4 4  3   3 33     444  4   4 4   4 4     4444    8   333  3   3 3   3 33  3 3  33   3   3 3 3 3  3  3   3 3333  3333       444   8                4444   444  4                     888888","88888  3     3 3333  3     3   4    3   3 3         4 4444  44444 4   4 4       8      3 3   3 3  33 3   3 3  33   3   3 3  33 3   3   3 3     3      3      4  8                4         4 4   4                 888888","88888  3     3 3   3 33333     4     333  3     4444  4     4   4  444  44444   8  3333   333   33 3 3   3  33 3    333  3   3      333  3     3         4444   8                44444 4444   444                  888888","88888                                                                           8                                                                               8                                                  888888","8888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888888","8833388333383888888883888883388333888"],"livesGraphic":["8833388333383888888883888883388333888","8 3  3 3  8 3888888833888 3  3 3  388","8 38 3 3338 3888888  3888 38 3 38 388","8 3338 3 88 38888888 3888 3333 333888","8 3 83 3333 3333838833383 3  3 3 8888","8 88 8    8    8 88   8 8 88 8 888888","8888888888888888888888888888888888888    3333     33                           ","2228228822282228288828828822882228288     33                                   ","2888282828882888288828282828282888288     33     333  33   33  3333   33333    ","2288282822882288282828282828282288288     33      33  33   33 33  33 33     33 ","2888228828882888228228222822882888888     22   2  22   22 22  222222  2222     ","2888282822282228288828282828282228288     22  22  22   22 22  22         22 22 ","8888888888888888888888888888888888888    2222222 2222   222    22222 22222     ","8888888888888888888888888888888888888"],"authorGraphic":["                                                                                                                     BBBBB  BB     BBB           BBBBBB                                "," FFFF FFF  FFFF FFFF F   F  FF  FFF  FFFF    FFF  FF  F   F FFFF    7   7 777  777 777 777 7777 7   7   7           BB   BB BB     BB            BB   BB         BB                BB  "," B    B  B B    B    B   B B  B B  B B      E    E  E EE EE E       7   7 7  7  7   7   7  7    77  7   7           BB   BB BB     BB            BB   BB                               "," BBB  B  B BBB  BBB  B B B B  B B  B BBB    E EE E  E E E E EEE     7 7 7 7  7  7   7   7  777  7 7 7   777  7  7   BB   BB BB  BBBBB   BBBBB    BB   BB BB BBB  BB BB BBB  BBBBBB BB  "," 3    333  3    3    3 3 3 3333 333  3      6  6 6666 6   6 6       7 7 7 777   7   7   7  7    7  77   7  7 7  7   BB   BB BB BB  BB  BB   BB   BB   BB  BB  BB BB  BB  BB    BB  BB  "," 1    1  1 1111 1111  1 1  1  1 1  1 1111    44  4  4 4   4 4444     7 7  7  7 777  7   7  7777 7   7   777   77    BBBBBBB BB BB  BB  BB   BB   BBBBBB   BB     BB  BB  BB   BB   BB  ","                                                                                                            777     BB   BB BB  BBBBBB  BBBBB    BB       BB     BB  BB  BB BBBBBB BB  "]};
+const W=320,H=200,canvas=document.getElementById('game'),ctx=canvas.getContext('2d',{alpha:false});
+const textCanvas=document.getElementById('textLayer'),tctx=textCanvas.getContext('2d',{alpha:true});
+const TEXT_SCALE=3;
+ctx.imageSmoothingEnabled=false;
+tctx.imageSmoothingEnabled=true;
+tctx.textBaseline='top';
+tctx.font='600 20px Consolas, \"Cascadia Mono\", \"Lucida Console\", monospace';
+const pixels=new Uint8Array(W*H), image=ctx.createImageData(W,H), rgba=image.data;
+const EGA=['#000000','#0000AA','#00AA00','#00AAAA','#AA0000','#AA00AA','#AA5500','#AAAAAA','#555555','#5555FF','#55FF55','#55FFFF','#FF5555','#FF55FF','#FFFF55','#FFFFFF'];
+const palette=[];
+for(const h of EGA){const n=parseInt(h.slice(1),16);palette.push([(n>>16)&255,(n>>8)&255,n&255]);}
+const levels=[0,51,102,153,204,255];
+for(let r=0;r<6;r++)for(let g=0;g<6;g++)for(let b=0;b<6;b++)palette.push([levels[r],levels[g],levels[b]]);
+while(palette.length<232)palette.push([0,0,0]);
+for(let i=0;i<24;i++){const v=Math.round(i*255/23);palette.push([v,v,v]);}
+while(palette.length<256)palette.push([0,0,0]);
+function qi(v){return Math.round(v)}
+function clearTextRect(x1,y1,x2,y2){
+  const ax=Math.max(0,Math.floor(Math.min(x1,x2)*TEXT_SCALE)-2),ay=Math.max(0,Math.floor(Math.min(y1,y2)*TEXT_SCALE)-2);
+  const bx=Math.min(textCanvas.width,Math.ceil((Math.max(x1,x2)+1)*TEXT_SCALE)+2),by=Math.min(textCanvas.height,Math.ceil((Math.max(y1,y2)+1)*TEXT_SCALE)+2);
+  tctx.clearRect(ax,ay,Math.max(0,bx-ax),Math.max(0,by-ay));
+}
+function cls(c=0){pixels.fill(c&255);tctx.clearRect(0,0,textCanvas.width,textCanvas.height)}
+function plot(x,y,c){x=qi(x);y=qi(y);if(x>=0&&x<W&&y>=0&&y<H)pixels[y*W+x]=c&255}
+function point(x,y){x=qi(x);y=qi(y);return(x>=0&&x<W&&y>=0&&y<H)?pixels[y*W+x]:0}
+function rect(x1,y1,x2,y2,c){const ox1=x1,oy1=y1,ox2=x2,oy2=y2;x1=qi(Math.min(x1,x2));x2=qi(Math.max(x1,x2));y1=qi(Math.min(y1,y2));y2=qi(Math.max(y1,y2));clearTextRect(ox1,oy1,ox2,oy2);for(let y=Math.max(0,y1);y<=Math.min(H-1,y2);y++){let p=y*W+Math.max(0,x1),e=y*W+Math.min(W-1,x2);for(;p<=e;p++)pixels[p]=c&255}}
+function hline(x1,y,x2,c,pattern=0xFFFF){y=qi(y);if(y<0||y>=H)return;let a=qi(Math.min(x1,x2)),b=qi(Math.max(x1,x2));for(let x=a;x<=b;x++)if((pattern>>(15-((x-a)&15)))&1)plot(x,y,c)}
+function line(x0,y0,x1,y1,c){x0=qi(x0);y0=qi(y0);x1=qi(x1);y1=qi(y1);let dx=Math.abs(x1-x0),sx=x0<x1?1:-1,dy=-Math.abs(y1-y0),sy=y0<y1?1:-1,err=dx+dy;for(;;){plot(x0,y0,c);if(x0===x1&&y0===y1)break;let e2=2*err;if(e2>=dy){err+=dy;x0+=sx}if(e2<=dx){err+=dx;y0+=sy}}}
+function put(sp,x,y,mode='pset'){x=qi(x);y=qi(y);for(let j=0;j<sp.length;j++){const row=sp[j];const yy=y+j;if(yy<0||yy>=H)continue;for(let i=0;i<row.length;i++){const xx=x+i;if(xx<0||xx>=W)continue;const c=parseInt(row[i],16)||0,p=yy*W+xx;if(mode==='xor')pixels[p]^=c;else if(mode==='or')pixels[p]|=c;else pixels[p]=c}}}
+function raw(rows,x,y,includeZero=true){for(let j=0;j<rows.length;j++){const row=rows[j];for(let i=0;i<row.length;i++){const c=parseInt(row[i],16);if(Number.isFinite(c)){if(includeZero||c)plot(x+i,y+j,c)}else if(includeZero)plot(x+i,y+j,0)}}}
+function render(){for(let i=0,o=0;i<pixels.length;i++,o+=4){const p=palette[pixels[i]]||palette[0];rgba[o]=p[0];rgba[o+1]=p[1];rgba[o+2]=p[2];rgba[o+3]=255}ctx.putImageData(image,0,0)}
+// Font bitmap 8×8 incorporato nel file.
+ // Non usa più Courier New né la rasterizzazione del browser:
+ // ogni carattere ha gli stessi pixel su Windows, Edge, Chrome e Firefox.
+const FONT8=new Uint8Array([0,0,0,0,0,0,0,0,64,64,64,64,64,0,0,64,96,96,96,0,0,0,0,0,40,48,48,120,80,120,80,96,56,84,84,112,24,20,84,56,114,84,84,120,15,21,37,39,56,64,68,62,68,68,68,60,64,64,64,0,0,0,0,0,32,64,64,64,64,64,64,32,0,128,128,128,128,128,128,0,0,0,0,16,84,56,40,0,0,0,16,16,124,16,16,0,0,0,0,0,0,0,0,128,0,0,0,0,192,0,0,0,0,0,0,0,0,0,0,64,64,64,128,128,128,0,0,0,56,108,68,68,68,68,108,56,48,80,16,16,16,16,16,16,48,72,8,8,16,32,64,248,112,136,8,48,8,136,136,112,8,24,40,40,72,252,8,8,120,128,128,176,200,8,136,112,56,36,68,120,68,68,68,56,248,8,16,16,32,32,64,64,56,68,68,56,68,68,68,56,56,68,68,68,60,68,72,56,0,0,64,0,0,0,0,64,0,0,64,0,0,0,0,64,0,0,0,24,96,64,48,8,0,0,0,120,0,120,0,0,0,0,0,96,24,8,48,64,48,72,72,8,16,16,0,16,14,49,46,82,82,84,91,32,16,48,40,72,120,68,68,132,120,68,68,72,124,68,68,120,28,34,66,64,64,66,34,60,120,68,66,66,66,66,68,120,124,64,64,64,120,64,64,124,124,64,64,64,120,64,64,64,28,38,66,64,78,66,38,58,66,66,66,66,126,66,66,66,64,64,64,64,64,64,64,64,8,8,8,8,8,72,72,48,68,72,80,80,112,80,72,68,64,64,64,64,64,64,64,124,99,99,99,85,85,85,89,73,100,100,100,84,84,84,76,76,28,34,65,65,65,65,34,28,120,68,68,68,120,64,64,64,28,34,65,65,65,65,34,31,120,68,68,68,120,76,68,68,56,68,64,32,28,4,68,56,124,16,16,16,16,16,16,16,68,68,68,68,68,68,68,56,132,68,68,72,40,40,48,16,140,76,76,84,85,83,51,35,68,72,40,48,48,40,72,68,68,68,40,40,16,16,16,16,124,4,8,16,16,32,64,124,64,64,64,64,64,64,64,64,0,0,0,128,128,128,128,64,128,128,128,128,128,128,128,128,0,0,48,80,80,72,0,0,0,0,0,0,0,0,0,0,0,64,0,0,0,0,0,0,0,0,56,72,24,104,72,120,64,64,120,68,68,68,68,120,0,0,56,68,64,64,68,56,4,4,60,68,68,68,68,60,0,0,56,68,124,64,68,56,64,64,224,64,64,64,64,64,0,0,60,68,68,68,68,60,64,64,120,100,68,68,68,68,64,0,64,64,64,64,64,64,64,0,64,64,64,64,64,64,64,64,72,80,96,80,80,72,64,64,64,64,64,64,64,96,0,0,119,73,73,73,73,73,0,0,120,100,68,68,68,68,0,0,56,68,68,68,68,56,0,0,120,68,68,68,68,120,0,0,60,68,68,68,68,60,0,0,112,64,64,64,64,64,0,0,112,72,96,24,72,120,64,64,224,64,64,64,64,96,0,0,68,68,68,68,76,60,0,0,136,136,80,80,80,32,0,0,153,154,90,106,102,36,0,0,32,160,64,192,160,32,0,0,136,136,80,80,80,32,0,0,120,8,16,32,64,120,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,0,0,0,0,104,88,0,0]);
+const glyphs=new Map();
+function glyph(ch){
+  if(glyphs.has(ch))return glyphs.get(ch);
+  let original=String(ch||' ');
+  if(original==='·')original='.';
+  if(original==='–'||original==='—')original='-';
+  if(original==='’'||original==='‘')original="'";
+  if(original==='“'||original==='”')original='"';
+  if(original.length){
+    const normalized=original.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    if(normalized)original=normalized[0];
+  }
+  let code=original.charCodeAt(0);
+  if(code<32||code>126)code=63;
+  const start=(code-32)*8,m=new Uint8Array(64);
+  for(let y=0;y<8;y++){
+    const bits=FONT8[start+y];
+    for(let x=0;x<8;x++)m[y*8+x]=(bits>>(7-x))&1;
+  }
+  glyphs.set(ch,m);
+  return m;
+}
+function textColor(index){const p=palette[index&255]||palette[15];return `rgb(${p[0]},${p[1]},${p[2]})`}
+function drawHDText(x,y,text,fg=15){
+  const s=String(text);if(!s)return;
+  const px=x*TEXT_SCALE,py=y*TEXT_SCALE;
+  tctx.save();
+  tctx.font='600 20px Consolas, "Cascadia Mono", "Lucida Console", monospace';
+  tctx.textBaseline='top';
+  tctx.fillStyle=textColor(fg);
+  tctx.shadowColor='rgba(0,0,0,.9)';tctx.shadowBlur=1.5;tctx.shadowOffsetX=1;tctx.shadowOffsetY=1;
+  const measured=Math.max(1,tctx.measureText(s).width),target=Math.max(1,s.length*21.5);
+  tctx.translate(px+1,py+1);tctx.scale(Math.min(1.9,target/measured),1);
+  tctx.fillText(s,0,0);
+  tctx.restore();
+}
+function printCell(row,col,text,fg=15,bg=0){const s=String(text),x=(col-1)*8,y=(row-1)*8;rect(x,y,x+Math.max(0,s.length*8-1),y+7,bg);drawHDText(x,y,s,fg)}
+function printPx(x,y,text,fg=15,bg=0){const s=String(text);rect(x,y,x+Math.max(0,s.length*8-1),y+7,bg);drawHDText(x,y,s,fg)}
+function fmtScore(n){return String(Math.max(0,Math.trunc(n))).padStart(7,' ')}
+// Audio: SOUND usa i tick del timer PC (18,2 Hz); PLAY interpreta il sottoinsieme usato dal sorgente.
+let audio=null,soundOn=true,musicNodes=[];
+function audioReady(){if(!audio){const A=window.AudioContext||window.webkitAudioContext;if(A)audio=new A()}if(audio&&audio.state==='suspended')audio.resume();return audio}
+function beep(freq,ticks=.2,delay=0,gain=.035){if(!soundOn||!Number.isFinite(freq)||freq<20)return;const a=audioReady();if(!a)return;const o=a.createOscillator(),g=a.createGain(),t=a.currentTime+Math.max(0,delay),dur=Math.max(.006,Math.abs(ticks)/18.2);o.type='square';o.frequency.setValueAtTime(Math.min(12000,freq),t);g.gain.setValueAtTime(gain,t);g.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(g).connect(a.destination);o.start(t);o.stop(t+dur+.01)}
+function stopMusic(){for(const n of musicNodes){try{n.stop()}catch{}}musicNodes=[]}
+function playBasic(src){if(!soundOn)return 0;const a=audioReady();if(!a)return 0;stopMusic();let tempo=120,oct=4,defLen=4,art=.82,i=0,t=a.currentTime+.03;const start=t,semi={C:0,D:2,E:4,F:5,G:7,A:9,B:11};const num=()=>{let s='';while(i<src.length&&/[0-9]/.test(src[i]))s+=src[i++];return s?parseInt(s,10):null};while(i<src.length){let c=src[i++].toUpperCase();if(/\s/.test(c))continue;if(c==='T'){tempo=num()||tempo;continue}if(c==='O'){oct=num()??oct;continue}if(c==='L'){defLen=num()||defLen;continue}if(c==='>'){oct++;continue}if(c==='<'){oct--;continue}if(c==='M'){let m=(src[i++]||'').toUpperCase();if(m==='S')art=.72;else if(m==='L')art=.98;else if(m==='N')art=.84;continue}if(c==='P'){let l=num()||defLen,d=240/(tempo*Math.max(1,l));while(src[i]==='.'){i++;d*=1.5}t+=d;continue}if(semi[c]!==undefined){let s=semi[c];if(src[i]==='#'||src[i]==='+'){s++;i++}else if(src[i]==='-'){s--;i++}let l=num()||defLen,d=240/(tempo*Math.max(1,l));while(src[i]==='.'){i++;d*=1.5}const midi=12*(oct+1)+s,f=440*Math.pow(2,(midi-69)/12),o=a.createOscillator(),g=a.createGain();o.type='square';o.frequency.value=f;g.gain.setValueAtTime(.028,t);g.gain.exponentialRampToValueAtTime(.0001,t+d*art);o.connect(g).connect(a.destination);o.start(t);o.stop(t+d*art+.01);musicNodes.push(o);t+=d;continue}if(c==='N'){num();continue}}
+return t-start}
+function setSound(v){soundOn=!!v;document.getElementById('soundBtn').textContent='SUONO: '+(soundOn?'ON':'OFF');if(!soundOn)stopMusic()}
+// Input
+const down=new Set(),pressed=new Set();
+function keyDown(code,repeat=false){audioReady();down.add(code);if(!repeat)pressed.add(code)}function keyUp(code){down.delete(code)}
+addEventListener('keydown',e=>{
+  if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code))e.preventDefault();
+  keyDown(e.code,e.repeat);
+  if(app.mode==='name'&&!e.repeat)nameKey(e);
+});
+addEventListener('keyup',e=>keyUp(e.code));
+for(const b of document.querySelectorAll('[data-key]')){const c=b.dataset.key;for(const ev of ['pointerdown','touchstart'])b.addEventListener(ev,e=>{e.preventDefault();keyDown(c,false)});for(const ev of ['pointerup','pointercancel','pointerleave','touchend'])b.addEventListener(ev,e=>{e.preventDefault();keyUp(c)})}
+document.getElementById('soundBtn').onclick=()=>setSound(!soundOn);document.getElementById('speedBtn').onclick=()=>cycleGameSpeed();document.getElementById('fullBtn').onclick=()=>{const el=document.querySelector('.frame');if(!document.fullscreenElement)el.requestFullscreen?.();else document.exitFullscreen?.()};
+function hit(code){return pressed.has(code)}
+// Persistenza Top Ten compatibile con il concetto originale del file BIN.
+const HS='aldus-invasion-topten-v2';
+function loadScores(){try{const x=JSON.parse(localStorage.getItem(HS));if(Array.isArray(x)&&x.length===10)return x}catch{}return Array.from({length:10},()=>({name:'Aldus Prinzimaker!',score:1000}))}
+let scores=loadScores();function saveScores(){try{localStorage.setItem(HS,JSON.stringify(scores))}catch{}}
+const app={mode:'presentation',time:0,returnMode:'game'};
+// Il BASIC originale era limitato dal tempo richiesto da PUT/GET/PSET sui PC del 1994.
+// Nel browser quelle operazioni sono quasi istantanee: usiamo quindi un clock esplicito.
+const BASE_GAME_TICK=.020;
+const GAME_SPEEDS=[{label:'LENTA',factor:1.4},{label:'NORMALE',factor:1},{label:'VELOCE',factor:.72}];
+let gameSpeedIndex=(()=>{try{const n=Number(localStorage.getItem('aldus-invasion-speed'));return Number.isInteger(n)&&n>=0&&n<GAME_SPEEDS.length?n:1}catch{return 1}})();
+function gameDelay(seconds){return seconds*GAME_SPEEDS[gameSpeedIndex].factor}
+function updateSpeedButton(){const b=document.getElementById('speedBtn');if(b)b.textContent='VELOCITÀ: '+GAME_SPEEDS[gameSpeedIndex].label}
+function cycleGameSpeed(){gameSpeedIndex=(gameSpeedIndex+1)%GAME_SPEEDS.length;try{localStorage.setItem('aldus-invasion-speed',String(gameSpeedIndex))}catch{}updateSpeedButton();if(app.mode==='game')g.tickDelay=Math.max(g.tickDelay,gameDelay(BASE_GAME_TICK));}
+updateSpeedButton();
+function switchMode(mode,init){app.mode=mode;app.time=0;pressed.clear();if(init)init()}
+// Presentazione originale
+const pres={};
+const PRES_WALK_SEQ=[0,1,2,1];
+const PRES_WALK_BOB=[0,-1,0,-1];
+
+function initPresentation(){
+  stopMusic();
+  cls();
+  rect(0,197,319,199,8);
+
+  Object.assign(pres,{
+    acc:0,t:0,b:0,flagP:true,d:150,
+    p:310,playerY:186,playerFrame:0,walkPhase:0,
+    rocketActive:true,rocketY:-23,rocketFrame:1,
+    ufoY:110,ufoX:0,ufoFrame:1,
+    alienTick:0,
+    bombActive:false,bombDropped:false,bombX:0,bombY:0,bombDX:-1.45,bombDY:6.2,
+    waitTop:false
+  });
+
+  put(ASSETS.ufo[0][1],5,110,'pset');
+  put(ASSETS.player[0],pres.p,pres.playerY,'pset');
+  put(ASSETS.razzo[pres.rocketFrame],50,pres.rocketY,'pset');
+  raw(ASSETS.authorGraphic,46,11,true);
+}
+
+function presentationRocketStep(){
+  if(!pres.rocketActive)return;
+  if(pres.t<80)return;
+
+  put(ASSETS.razzo[pres.rocketFrame],50,pres.rocketY,'xor');
+
+  let fall;
+  if(pres.rocketY<80)fall=6.0;
+  else if(pres.rocketY<130)fall=4.0;
+  else if(pres.rocketY<156)fall=2.4;
+  else if(pres.rocketY<169)fall=1.25;
+  else fall=.55;
+
+  pres.rocketY=Math.min(174,pres.rocketY+fall);
+  pres.rocketFrame=pres.rocketFrame===1?2:1;
+
+  if(pres.rocketY>=174){
+    pres.rocketY=174;
+    pres.rocketActive=false;
+    put(ASSETS.razzo[0],50,174,'pset');
+    beep(90,.18);
+  }else{
+    put(ASSETS.razzo[pres.rocketFrame],50,pres.rocketY,'xor');
+    const braking=Math.max(0,(pres.rocketY-120)/54);
+    beep(75+braking*150,.06);
+  }
+}
+
+function presentationPlayerStep(){
+  if(!pres.flagP)return;
+
+  const oldBob=PRES_WALK_BOB[pres.walkPhase];
+  put(
+    ASSETS.player[pres.playerFrame],
+    pres.p,
+    pres.playerY+oldBob,
+    'xor'
+  );
+
+  pres.p-=1.8;
+  pres.walkPhase=(pres.walkPhase+1)%PRES_WALK_SEQ.length;
+  pres.playerFrame=PRES_WALK_SEQ[pres.walkPhase];
+
+  const newBob=PRES_WALK_BOB[pres.walkPhase];
+  put(
+    ASSETS.player[pres.playerFrame],
+    pres.p,
+    pres.playerY+newBob,
+    'xor'
+  );
+
+  if(pres.p<=66){
+    put(
+      ASSETS.player[pres.playerFrame],
+      pres.p,
+      pres.playerY+newBob,
+      'xor'
+    );
+    pres.flagP=false;
+    pres.p=65;
+    pres.playerFrame=0;
+    put(ASSETS.player[0],65,186,'pset');
+    put(ASSETS.razzo[0],50,174,'or');
+  }
+}
+
+function presentationUfoStep(){
+  put(ASSETS.ufo[0][pres.ufoFrame],5+pres.ufoX,pres.ufoY,'xor');
+  if(pres.t>60)pres.ufoY-=1;
+  pres.ufoX+=2;
+  pres.ufoFrame^=1;
+  put(ASSETS.ufo[0][pres.ufoFrame],5+pres.ufoX,pres.ufoY,'xor');
+}
+
+function maybeDropPresentationBomb(){
+  if(pres.bombDropped||!pres.flagP)return;
+
+  const ufoCenter = 5 + pres.ufoX + 12;
+  const playerCenter = pres.p + 6;
+
+  // Quando l'UFO è esattamente sopra al player in corsa, sgancia la bomba.
+  if(ufoCenter >= playerCenter){
+    pres.bombDropped = true;
+    pres.bombActive = true;
+    pres.bombX = ufoCenter;
+    pres.bombY = pres.ufoY + 9;
+    beep(220,.08);
+  }
+}
+
+function presentationBombStep(){
+  if(!pres.bombActive)return;
+
+  put(ASSETS.enemyShot,pres.bombX,pres.bombY,'xor');
+
+  pres.bombX += pres.bombDX;
+  pres.bombY += pres.bombDY;
+
+  // La bomba sfiora il player senza colpirlo e prosegue verso il basso.
+  if(pres.bombY > 194){
+    pres.bombActive = false;
+    return;
+  }
+
+  put(ASSETS.enemyShot,pres.bombX,pres.bombY,'xor');
+}
+
+function presentationAliensStep(){
+  // Gli alieni restano animati, ma con 300 ms aggiuntivi tra un frame e l'altro:
+  // a 10 fps questo significa cambiare sprite ogni 4 tick = 400 ms.
+  pres.alienTick++;
+  if(pres.alienTick >= 4){
+    pres.alienTick = 0;
+    pres.b ^= 1;
+  }
+
+  for(let r=0;r<5;r++){
+    put(ASSETS.alien[r][pres.b],90,28+r*32,'pset');
+  }
+}
+
+function presStep(){
+  presentationUfoStep();
+  presentationRocketStep();
+  presentationPlayerStep();
+  maybeDropPresentationBomb();
+  presentationBombStep();
+  presentationAliensStep();
+
+  const ry=pres.rocketY;
+  if(ry>=30&&ry<=40)printCell(5,15,'Giovanni ',7);
+  if(ry>=58&&ry<=70)printCell(9,15,'Vicky    ',7);
+  if(ry>=88&&ry<=100)printCell(13,15,'Aldus    ',7);
+  if(ry>=120&&ry<=135)printCell(17,15,'Giacomino',7);
+  if(ry>=150&&ry<=166)printCell(21,15,'Mimmo    ',7);
+
+  if(!pres.rocketActive&&pres.t>=80){
+    printCell(24,18,'<--- PLAYER',1+(pres.t%7));
+  }
+
+  printCell(1,10,'ALDUS INVASION 1 !',1+(pres.t%7));
+  pres.t++;
+}
+
+function updatePresentation(dt){
+  if(hit('Enter')||hit('Space')){
+    startNewGame();
+    return;
+  }
+
+  pres.acc+=dt;
+
+  while(pres.acc>=.10){
+    pres.acc-=.10;
+    presStep();
+
+    if(pres.t>=170){
+      switchMode('topten',initTopTen);
+      return;
+    }
+  }
+}
+function initTopTen(){stopMusic();cls();topState.acc=0;topState.elapsed=0;topState.row=0;drawTopTen()}
+const topState={};function drawTopTen(){cls();printCell(1,4,'ALDUS INVASION 1! - TOP TEN Players',14);scores.forEach((s,i)=>printCell(3+i*2,6,String(i+1).padStart(2)+' '+s.name.padEnd(18).slice(0,18)+' ^ '+s.score, i===topState.row?15:7))}
+function updateTopTen(dt){if(hit('Enter')||hit('Space')){startNewGame();return}if(hit('Escape')){switchMode('presentation',initPresentation);return}topState.elapsed+=dt;topState.acc+=dt;if(topState.acc>.35){topState.acc=0;topState.row=(topState.row+1)%10;drawTopTen()}if(topState.elapsed>8)switchMode('presentation',initPresentation)}
+// Motore del gioco principale, trasposizione delle variabili BASIC originali.
+const g={};
+function qmmForLevel(l){const sets=[[24,2,4,6,8,10,12,14,16,18,20,22],[20,2,3,5,6,8,9,12,14,13,15,18],[18,1,2,3,5,7,8,10,11,13,14,16],[16,1,2,3,4,5,6,7,8,10,12,14],[13,1,2,2,3,4,4,5,6,7,9,11],[11,1,2,2,3,3,4,4,5,6,8,10]];return sets[Math.min(5,Math.max(0,l-1))].slice()}
+function speedForLevel(l){if(l===1)return[2,5.5];if(l===2)return[3,5.5];if(l===3)return[4,6.5];if(l===4)return[5,6];if(l===5)return[5,5.5];return[6,5]}
+function startNewGame(){scores=loadScores();Object.assign(g,{level:1,score:0,lives:3,slow:false,nextLifeScore:1500,notice:'',noticeTime:0});setupLevel()}
+function setupLevel(){stopMusic();cls();const sp=speedForLevel(g.level),qs=qmmForLevel(g.level);Object.assign(g,{posR:100,fire:0,maMM:0,mPos:0,poVeMo:0,turn:0,lMaxR:70,lMaxL:1,mDir:5,veGoal:80,lili:5,flagUfo:false,b:0,mm:0,qmm:qs[0],qStages:qs.slice(1),veCoM:sp[0],veCoP:sp[1],levDisc:5+(g.level-1)*2,flagDrop:false,ndS:0,tickAcc:0,tickDelay:gameDelay(BASE_GAME_TICK),moveAcc:0,alienShots:Array.from({length:4},()=>({state:0,x:0,y:0})),linea:Array.from({length:5},()=>Array(10).fill(1)),shotX:0,shotY:0,ufoX:0,ufoDir:0,ufoFrame:0,ufoVariant:0,effect:null,exitRequested:false});rect(0,183,319,185,8);put(ASSETS.razzo[0],g.posR,159,'pset');beep(165,.2);raw(ASSETS.keys,0,184,true);raw(ASSETS.livesGraphic,216,186,true);for(let c=0;c<10;c++)for(let r=0;r<5;r++)put(ASSETS.alien[r][0],c*25+2,(r+1)*15,'pset');drawLives();drawHud();switchMode('game')}
+function drawLives(){
+  rect(294,190,319,199,0);
+  // g.lives comprende anche il razzo attualmente in gioco.
+  // Nell'indicatore mostriamo soltanto quelli rimasti in riserva.
+  const reserve=Math.max(0,g.lives-1);
+  for(let l=1;l<=reserve;l++)raw(ASSETS.miniShip,320-l*8+1,193,true);
+}
+function drawHud(){
+  printCell(1,1,fmtScore(g.score)+' Pts',15);
+  printCell(1,15,'LEVEL '+g.level,14);
+  rect(64,8,255,15,0);
+  if(g.noticeTime>0&&g.notice)printPx(72,8,g.notice,14,0);
+}
+function awardLife(reason){
+  g.lives++;
+  if(reason==='PUNTI'){
+    g.notice='EXTRA LIFE: 1500 PUNTI';
+    g.noticeTime=2.8;
+  }
+  beep(660,.18);beep(880,.18,.08);beep(1100,.22,.16);
+  if(app.mode==='game')drawLives();
+}
+function addScore(points){
+  g.score+=points;
+  while(g.score>=g.nextLifeScore){
+    g.nextLifeScore+=1500;
+    awardLife('PUNTI');
+  }
+}
+function movementInput(dt){g.moveAcc-=dt;let dir=0;if(down.has('ArrowRight'))dir=1;if(down.has('ArrowLeft'))dir=-1;if(dir&&g.moveAcc<=0){g.po=dir*6;g.moveAcc=.055}if((down.has('Space')||down.has('ArrowUp'))&&g.fire===0)g.fire=1}
+function eraseAllAlienShots(){for(const s of g.alienShots)if(s.state===2){put(ASSETS.enemyShot,s.x,s.y,'xor');s.state=0}}
+function beginRocketExplosion(after){put(ASSETS.razzo[0],g.posR,159,'xor');eraseAllAlienShots();g.effect={kind:'rocket',time:0,frame:-1,last:-1,after}}
+
+function fxPixel(x,y,c,mode='xor'){
+  x=qi(x);y=qi(y);
+  if(x<0||x>=W||y<0||y>=H||!c)return;
+  const p=y*W+x;
+  if(mode==='xor')pixels[p]^=c;
+  else if(mode==='pset')pixels[p]=c;
+  else pixels[p]|=c;
+}
+function fxHLine(x1,y,x2,c,mode='xor'){
+  x1=qi(x1);x2=qi(x2);y=qi(y);
+  if(y<0||y>=H)return;
+  if(x1>x2){const t=x1;x1=x2;x2=t}
+  for(let x=x1;x<=x2;x++)fxPixel(x,y,c,mode);
+}
+function drawSkyAlienExplosion(frame,cx,cy,mode='xor'){
+  cx=qi(cx);cy=qi(cy);
+  const f=Math.max(0,Math.min(5,frame));
+
+  // Esplosione aerea simmetrica e sospesa: stesso feeling dell'esplosione del razzo,
+  // ma senza base a terra. Nucleo bianco/giallo, corona rossa e spilli diagonali.
+  const rays=[2,4,6,8,10,12][f];
+  const core=[1,2,3,4,3,2][f];
+
+  // Nucleo caldo
+  for(let dy=-core;dy<=core;dy++){
+    const w=core-Math.floor(Math.abs(dy)/1.2);
+    fxHLine(cx-w,cy+dy,cx+w,15,mode);
+  }
+  for(let dy=-(core+1);dy<=core+1;dy++){
+    const w=Math.max(0,core+1-Math.ceil(Math.abs(dy)/1.2));
+    if(w>0)fxHLine(cx-w,cy+dy,cx+w,14,mode);
+  }
+
+  // Anello interno rosso-arancio
+  const ring = [
+    [-2,-3],[0,-3],[2,-3],[-3,-2],[3,-2],[-3,0],[3,0],[-3,2],[3,2],[-2,3],[0,3],[2,3],
+    [-1,-4],[1,-4],[-4,-1],[4,-1],[-4,1],[4,1],[-1,4],[1,4]
+  ];
+  for(const [dx,dy] of ring){
+    fxPixel(cx+dx,cy+dy,(f<3?12:4),mode);
+  }
+
+  // Bracci principali dell'esplosione
+  const hot = f<3 ? 14 : 12;
+  const edge = f<3 ? 12 : 4;
+  fxHLine(cx-rays,cy,cx-4,edge,mode);
+  fxHLine(cx+4,cy,cx+rays,edge,mode);
+  fxHLine(cx,cy-rays,cx,cy-4,edge,mode);
+  fxHLine(cx,cy+4,cx,cy+rays,edge,mode);
+
+  for(let i=4;i<=rays;i+=2){
+    const c=i<rays-1?hot:edge;
+    fxPixel(cx-i,cy,c,mode); fxPixel(cx+i,cy,c,mode);
+    fxPixel(cx,cy-i,c,mode); fxPixel(cx,cy+i,c,mode);
+  }
+
+  // Spille diagonali e schegge pixel
+  const diag = Math.max(2,rays-2);
+  for(let i=2;i<=diag;i+=2){
+    const c=i<diag?hot:edge;
+    fxPixel(cx-i,cy-i,c,mode); fxPixel(cx+i,cy-i,c,mode);
+    fxPixel(cx-i,cy+i,c,mode); fxPixel(cx+i,cy+i,c,mode);
+  }
+
+  // Nuvola esterna frastagliata, più ampia a metà esplosione
+  if(f>=1){
+    const cloud = [
+      [-rays-1,-1],[-rays,1],[-rays+1,-3],[rays+1,1],[rays,-1],[rays-1,3],
+      [-1,-rays-1],[1,-rays],[3,-rays+1],[-1,rays+1],[1,rays],[-3,rays-1],
+      [-diag-1,-diag],[diag+1,-diag],[-diag-1,diag],[diag+1,diag]
+    ];
+    for(const [dx,dy] of cloud)fxPixel(cx+dx,cy+dy,4,mode);
+  }
+
+  // Bagliori puntiformi, per dare l'idea di esplosione "nel cielo"
+  if(f>=2){
+    const sparks = [
+      [-rays-4,0],[rays+4,0],[0,-rays-4],[0,rays+4],
+      [-diag-3,-diag-2],[diag+3,-diag-2],[-diag-3,diag+2],[diag+3,diag+2]
+    ];
+    for(const [dx,dy] of sparks)fxPixel(cx+dx,cy+dy,7,mode);
+  }
+}
+
+function beginLastAlienExplosion(cx,cy){
+  eraseAllAlienShots();
+
+  // Durante la sequenza finale il campo resta fermo.
+  if(g.flagUfo){
+    put(ASSETS.ufo[g.ufoVariant][g.ufoFrame],g.ufoX,15,'xor');
+    g.flagUfo=false;
+  }
+
+  g.effect={
+    kind:'lastAlien',
+    time:0,
+    lastFrame:-1,
+    cx:Math.max(12,Math.min(W-12,qi(cx))),
+    cy:Math.max(12,Math.min(H-20,qi(cy))),
+    cleared:false,
+    after:completeLevel
+  };
+}
+function updateEffect(dt){
+  const e=g.effect;
+  if(!e)return false;
+  e.time+=dt;
+
+  if(e.kind==='rocket'){
+    const f=Math.min(5,Math.floor(e.time/.16));
+    if(f!==e.last){
+      if(e.last>=0)put(ASSETS.explosion[e.last],g.posR,159,'xor');
+      put(ASSETS.explosion[f],g.posR,159,'xor');
+      e.last=f;
+      beep(120+Math.random()*500,.2);
+    }
+    if(e.time>=1.05){
+      put(ASSETS.explosion[e.last],g.posR,159,'xor');
+      const fn=e.after;
+      g.effect=null;
+      fn();
+    }
+    return true;
+  }
+
+  if(e.kind==='lastAlien'){
+    // Esplosione sospesa nel cielo: simmetrica, più leggibile e senza appoggiarsi al pavimento.
+    const step=.10;
+    const growEnd=6*step;
+    const holdEnd=growEnd+.15;
+    const shrinkEnd=holdEnd+5*step;
+    let frame=-1;
+
+    if(e.time<growEnd){
+      frame=Math.min(5,Math.floor(e.time/step));
+    }else if(e.time<holdEnd){
+      frame=5;
+    }else if(e.time<shrinkEnd){
+      frame=Math.max(0,4-Math.floor((e.time-holdEnd)/step));
+    }
+
+    if(frame>=0&&frame!==e.lastFrame){
+      if(e.lastFrame>=0)drawSkyAlienExplosion(e.lastFrame,e.cx,e.cy,'xor');
+      drawSkyAlienExplosion(frame,e.cx,e.cy,'xor');
+      e.lastFrame=frame;
+
+      const rising=e.time<holdEnd;
+      const tone=rising?220+frame*120:260+frame*70;
+      beep(tone,.12);
+    }
+
+    if(e.time>=shrinkEnd&&!e.cleared){
+      if(e.lastFrame>=0)drawSkyAlienExplosion(e.lastFrame,e.cx,e.cy,'xor');
+      e.lastFrame=-1;
+      e.cleared=true;
+    }
+
+    // Dopo il completo riassorbimento, aspetta un secondo e poi passa oltre.
+    if(e.time>=shrinkEnd+1){
+      const fn=e.after;
+      g.effect=null;
+      fn();
+    }
+    return true;
+  }
+
+  if(e.kind==='ufo'){
+    const f=Math.floor(e.time/.08)%2;
+    if(f!==e.last){
+      if(e.last>=0)put(ASSETS.ufo[g.ufoVariant][e.last?2:g.ufoFrame],g.ufoX,15,'xor');
+      put(ASSETS.ufo[g.ufoVariant][f?2:g.ufoFrame],g.ufoX,15,'xor');
+      e.last=f;
+      beep(100+e.time*900,.15);
+    }
+    if(e.time>=.8){
+      put(ASSETS.ufo[g.ufoVariant][e.last?2:g.ufoFrame],g.ufoX,15,'xor');
+      g.flagUfo=false;
+      addScore(200+g.ufoVariant*150);
+      g.effect=null;
+    }
+    return true;
+  }
+
+  return false;
+}
+function playerHit(){beginRocketExplosion(()=>{g.lives--;drawLives();if(g.lives<1)finishGame(false);else put(ASSETS.razzo[0],g.posR,159,'pset')})}
+function updateEnemyShots(){for(const s of g.alienShots){if(s.state!==2)continue;put(ASSETS.enemyShot,s.x,s.y,'xor');s.y+=g.veCoM;let pf=point(s.x+1,s.y+5)+point(s.x,s.y+4)+point(s.x+2,s.y+4);put(ASSETS.enemyShot,s.x,s.y,'xor');if(pf!==0){s.state=0;if(s.y>150&&s.y<177){put(ASSETS.enemyShot,s.x,s.y,'xor');playerHit();return}else{beep(100,.2);if(s.y<175)put(ASSETS.enemyShot,s.x,s.y,'xor')}}if(s.y>=177){put(ASSETS.enemyShot,s.x,s.y,'xor');s.state=0}}}
+function alienMove(){for(let c=0;c<10;c++)for(let r=0;r<5;r++)if(g.linea[r][c])put(ASSETS.alien[r][g.b],c*25+2+g.mPos,(r+1)*15+g.poVeMo,'xor');hline(1+g.mPos,g.poVeMo+g.veGoal,10+g.mPos,0);g.mPos+=g.mDir;g.b^=1;if(g.flagDrop){g.poVeMo+=g.levDisc;g.flagDrop=false}for(let c=0;c<10;c++)for(let r=0;r<5;r++)if(g.linea[r][c])put(ASSETS.alien[r][g.b],c*25+2+g.mPos,(r+1)*15+g.poVeMo,'xor');for(let k=0;k<2;k++){const aaa=1+Math.floor(Math.random()*50);if((g.level<=2&&aaa>21&&aaa<29)||(g.level>2&&aaa%5===0)){g.ndS=Math.min(4,g.ndS+1);for(let i=0;i<g.ndS;i++)if(g.alienShots[i].state===0){g.alienShots[i].state=1;break}}}beep(62,.2)}
+function spawnPreparedShots(){if(g.turn<=1)return;for(let ns=0;ns<4;ns++){const s=g.alienShots[ns];if(g.lili>0&&s.state===1){let ppp=g.veGoal,f=Math.floor(Math.random()*9);if(!g.linea[g.lili-1][f]){let r;for(r=g.lili-2;r>=0;r--){ppp-=15;if(g.linea[r][f])break}if(r<0){ppp=g.veGoal;for(f=0;f<10;f++)if(g.linea[g.lili-1][f])break}}const of=f*25+8+g.mPos;let dup=false;for(let x=0;x<4;x++)if(x!==ns&&g.alienShots[x].state&&g.alienShots[x].x===of)dup=true;if(dup){s.state=0;continue}s.x=of;s.y=7+g.poVeMo+ppp;s.state=2;put(ASSETS.enemyShot,s.x,s.y,'xor')}}}
+function qmmUpdate(){const m=g.maMM,l=g.level,q=g.qStages;if(m>48-l)g.qmm=q[0];else if(m>45-l)g.qmm=q[1];else if(m>40-l)g.qmm=q[2];else if(m>30-l)g.qmm=q[3];else if(m>25-l)g.qmm=q[4];else if(m>20-l)g.qmm=q[5];else if(m>15-l)g.qmm=q[6];else if(m>10-l)g.qmm=q[7];else if(m>8-l)g.qmm=q[8];else if(m>5-l)g.qmm=q[9];else if(m>3-l)g.qmm=q[10]}
+function recomputeFormation(){g.lMaxR=70;g.lMaxL=1;g.veGoal=80;for(let c=0;c<10;c++){let n=0;for(let r=0;r<5;r++)n+=g.linea[r][c];if(n===0)g.lMaxL-=25;else break}for(let c=9;c>=0;c--){let n=0;for(let r=0;r<5;r++)n+=g.linea[r][c];if(n===0)g.lMaxR+=25;else break}for(g.lili=5;g.lili>=1;g.lili--){let n=0;for(let c=0;c<10;c++)n+=g.linea[g.lili-1][c];if(n===0)g.veGoal-=15;else break}}
+function hitUfo(){put(ASSETS.ufo[g.ufoVariant][g.ufoFrame],g.ufoX,15,'xor');g.effect={kind:'ufo',time:0,last:-1}}
+function updatePlayerShot(){
+  if(g.fire===1){
+    g.shotX=g.posR+6;
+    g.shotY=148;
+    g.fire=2;
+    put(ASSETS.shot,g.shotX,g.shotY,'pset');
+  }
+  if(g.fire!==2)return;
+
+  put(ASSETS.shot,g.shotX,g.shotY,'xor');
+  g.shotY-=g.veCoP;
+
+  if(g.shotY<5){
+    g.fire=0;
+    return;
+  }
+
+  const pf=
+    point(g.shotX+1,g.shotY)+
+    point(g.shotX+1,g.shotY+3)+
+    point(g.shotX,g.shotY+1)+
+    point(g.shotX+2,g.shotY+2);
+
+  if(pf){
+    put(ASSETS.shot,g.shotX,g.shotY,'xor');
+    g.fire=0;
+
+    const old=g.maMM;
+    let finalExplosion=null;
+
+    for(let c=0;c<10;c++){
+      for(let r=0;r<5;r++){
+        if(!g.linea[r][c])continue;
+
+        let col=0;
+        if(g.shotX>c*25+g.mPos&&g.shotX<c*25+g.mPos+22)col++;
+        if(g.shotY>(r+1)*15+g.poVeMo-1&&g.shotY<(r+1)*15+g.poVeMo+12)col++;
+
+        if(col===2){
+          const alienX=c*25+2+g.mPos;
+          const alienY=(r+1)*15+g.poVeMo;
+
+          g.linea[r][c]=0;
+          put(ASSETS.alien[r][g.b],alienX,alienY,'xor');
+          g.maMM++;
+          addScore(10);
+          beep(200,.5);
+          if(g.maMM>25-g.level*3)addScore(5*g.level);
+
+          if(g.maMM===50){
+            // Centra l'esplosione pixel sull'ultimo invasore.
+            finalExplosion={x:alienX+10,y:alienY+6};
+          }
+        }
+      }
+    }
+
+    if(finalExplosion){
+      // Nel ramo collisione il colpo è stato temporaneamente ridisegnato
+      // nella nuova posizione. Lo eliminiamo prima di congelare il campo.
+      put(ASSETS.shot,g.shotX,g.shotY,'xor');
+      g.fire=0;
+
+      recomputeFormation();
+      beginLastAlienExplosion(finalExplosion.x,finalExplosion.y);
+      return;
+    }
+
+    if(
+      old===g.maMM&&
+      g.flagUfo&&
+      g.shotX>g.ufoX&&g.shotX<g.ufoX+25&&
+      g.shotY>14&&g.shotY<25
+    ){
+      put(ASSETS.shot,g.shotX,g.shotY,'xor');
+      hitUfo();
+      return;
+    }
+
+    qmmUpdate();
+    recomputeFormation();
+  }
+
+  put(ASSETS.shot,g.shotX,g.shotY,'xor');
+}
+function maybeSpawnUfo(){if(g.poVeMo<15||g.flagUfo||g.turn%25!==0)return;const aaa=1+Math.floor(Math.random()*60),ok=(g.level>2&&aaa===25)||(g.level===2&&aaa>24&&aaa<29)||(g.level===1&&aaa>19&&aaa<31);if(!ok)return;g.flagUfo=true;if((1+Math.floor(Math.random()*50))%2===0){g.ufoX=290;g.ufoDir=-3}else{g.ufoX=5;g.ufoDir=3}g.ufoFrame=0;g.ufoVariant=(1+Math.floor(Math.random()*10))%2===0?0:1;put(ASSETS.ufo[g.ufoVariant][0],g.ufoX,15,'pset')}
+function moveUfo(){put(ASSETS.ufo[g.ufoVariant][g.ufoFrame],g.ufoX,15,'xor');g.ufoX+=g.ufoDir;g.ufoFrame^=1;put(ASSETS.ufo[g.ufoVariant][g.ufoFrame],g.ufoX,15,'xor');if(g.ufoFrame)beep(1500,.1);else{beep(500,.2);beep(200,.1,.012)}if(g.ufoX>=290||g.ufoX<=5){put(ASSETS.ufo[g.ufoVariant][g.ufoFrame],g.ufoX,15,'xor');g.flagUfo=false}}
+function gameTick(){if(g.po){put(ASSETS.razzo[0],g.posR,159,'xor');g.posR=Math.max(2,Math.min(300,g.posR+g.po));put(ASSETS.razzo[0],g.posR,159,'xor');g.po=0}updateEnemyShots();if(g.effect)return gameDelay(.01);g.mm++;let delay=BASE_GAME_TICK;if(g.mm>=g.qmm){g.mm=0;alienMove()}else if(g.qmm<=4)delay=BASE_GAME_TICK;updateEnemyShots;spawnPreparedShots();updatePlayerShot();if(g.effect)return gameDelay(.01);const oldDir=g.mDir;if(g.mPos>g.lMaxR)g.mDir=-5;if(g.mPos<g.lMaxL)g.mDir=5;if(g.mDir!==oldDir)g.flagDrop=true;if(g.maMM>=50){completeLevel();return gameDelay(.01)}if(g.poVeMo+g.veGoal>=150){beginRocketExplosion(()=>{g.lives=0;finishGame(true)});return gameDelay(.01)}drawHud();maybeSpawnUfo();g.turn++;if(g.turn>10000)g.turn=2;if(g.flagUfo)moveUfo();if(g.slow)delay+=.5;return gameDelay(delay)}
+function updateGame(dt){if(g.noticeTime>0)g.noticeTime=Math.max(0,g.noticeTime-dt);if(hit('Escape')){switchMode('presentation',initPresentation);return}if(hit('KeyS'))setSound(!soundOn);if(hit('KeyV'))cycleGameSpeed();if(hit('KeyR'))g.slow=!g.slow;if(hit('KeyP')){initPause();return}movementInput(dt);if(updateEffect(dt))return;g.tickAcc+=dt;let guard=0;while(g.tickAcc>=g.tickDelay&&guard++<80){g.tickAcc-=g.tickDelay;g.tickDelay=gameTick();if(app.mode!=='game'||g.effect)break}}
+function completeLevel(){
+  g.level++;
+  const j=g.level;
+  // Gli intermezzi compaiono ogni due livelli:
+  // JOKE1 tra 2 e 3, JOKE2 tra 4 e 5.
+  if(j===3)switchMode('joke1',initJoke1);
+  else if(j===5)switchMode('joke2',initJoke2);
+  else setupLevel();
+}
+// Pausa: stesso omino grande che attraversa la base.
+const pause={};function initPause(){Object.assign(pause,{x:300,y:169,frame:3,acc:0,drawn:false});switchMode('pause')}
+function updatePause(dt){if(hit('KeyP')||hit('ArrowDown')){if(pause.drawn)put(ASSETS.player[pause.frame],pause.x,pause.y,'xor');switchMode('game');return}pause.acc+=dt;if(pause.acc>=.09){pause.acc=0;if(pause.drawn)put(ASSETS.player[pause.frame],pause.x,pause.y,'xor');pause.x-=2.2;pause.frame++;if(pause.frame===6)pause.frame=3;if(pause.x<3)pause.x=300;put(ASSETS.player[pause.frame],pause.x,pause.y,'xor');pause.drawn=true}}
+// Intermezzi: traiettorie e sprite ricavati dalle quattro SUB JOKE originali.
+const joke={};
+const MUS1='O2L10T48 CA CA CACADEFFFEDD10DEFGFEG5E3P8CACAFEDCDFDCDFDP3 T250CACACACADEFFFEDD8DEFGFEG5E3P10CACAFEDCDFDCDFD';
+const MUS2='T150MSL16P1P1P1P1P1P3O2C10P60O4C O3P30GP30EO4P40CO3P30GP30EP10 O2C#10P60O4C#O3P30G#P30FO4P40C#O3P30G#P30F P10O2C10P60O4C O3P30GP30EO4P40CO3P30GP30EP10 O2L35CCCCCCCCCCL40EEEEEEEEEE L45GGGGGGGGGGO3L50CCCCCCCCCCP3P5 T180MSL18P5O1C9P8O3GP30EO4P40CO3P30GP30EP10O2C#10P60O4C#O3P30G#P30FO4P40C#O3P30G#P30F P10O2C10P60O4C O3P30GP30EO4P40CO3P30GP30EP10 O2L35CCCCCCCCCCL40EEEEEEEEEE L45GGGGGGGGGGO3L50CCCCCCCCCC';
+const MUS3='T145MSL8O2P20CACBCACBP25CP10 CDP10DP5CACACACAP25CP10CDP3CACBCACBP25CP10CDP10DP8CACACACAP25CP10CDP5CACBCACBP25CP10CDP10DP5CACACACAP25CP10CDP3CACBCACBP25CP10CDP10DP5CACACACAP25CP10CDP3CACAP25CP10CDP10DP10BFEP25CP25CDP10D L9T170P1CACBCACBP25CP10CDP10DP5CACACACAP25CP10CDP3CACBCACBP25CP10CDP10DP8CACACACAP25CP10CDP5CACBCACBP25CP10CDP10DP5CACACACAP25CP10CDP10BFEP25CP25CDP10D';
+function jokeBase(){
+  cls();
+  printCell(23,16,'Intermezzo.',2);
+  if(joke.bonusTime>0)printCell(2,8,'BONUS INTERMEZZO: +1 VITA',14);
+}
+function initJoke1(){
+  playBasic(MUS1);
+  Object.assign(joke,{phase:0,acc:0,x:10,b:0,uX:290,uY:10,uF:0,bullets:[],t:0,bonusTime:2.8});
+  awardLife('INTERMEZZO');
+  drawJoke1();
+}
+function drawJoke1(){jokeBase();rect(0,150,319,160,1);hline(0,154,319,0,0xF0F0);put(ASSETS.alien[3][joke.b],joke.x,146,'or');if(joke.uX<310)put(ASSETS.ufo[0][joke.uF],joke.uX,joke.uY,'xor');for(const s of joke.bullets)put(ASSETS.enemyShot,s.x,s.y,'xor')}
+function updateJoke1(dt){
+  if(joke.bonusTime>0)joke.bonusTime=Math.max(0,joke.bonusTime-dt);
+  if(hit('Enter')||hit('Space')){stopMusic();initNewLevel(3);return}
+  joke.acc+=dt;
+  if(joke.acc<.08)return;
+  joke.acc=0;
+  joke.t++;
+  if(joke.phase===0){
+    joke.x+=2;
+    if(joke.x>=24&&joke.x<68){joke.uX-=12;joke.uY+=joke.x/25}
+    else if(joke.x>=88&&joke.x<106){joke.uX+=8;joke.uY+=5}
+    joke.uF^=1;
+    if(joke.x>=102){joke.phase=1;joke.x=104}
+  }else{
+    joke.x+=5;
+    joke.uX=Math.min(300,joke.uX+5.3);
+    if([115,144,164,174,194,204,219,229,244,259,274].some(v=>Math.abs(joke.x-v)<3))
+      joke.bullets.push({x:joke.uX+12,y:joke.uY+9});
+    for(const s of joke.bullets)s.y+=5;
+    joke.bullets=joke.bullets.filter(s=>s.y<=150);
+    if(joke.x>294){stopMusic();initNewLevel(3);return}
+  }
+  joke.b^=1;
+  drawJoke1();
+}
+function initJoke2(){
+  playBasic(MUS2);
+  Object.assign(joke,{
+    phase:0,acc:0,elapsed:0,
+    uX:5,uY:150,uF:0,
+    p1:5,p2:-35,f1:7,f2:5,
+    bombX:258,bombY:54,bombActive:false,
+    impactTimer:0,impactFrame:0,lastImpactFrame:-1,
+    bonusTime:2.8
+  });
+  awardLife('INTERMEZZO');
+  drawJoke2();
+}
+function finishJoke2(){
+  stopMusic();
+  initNewLevel(5);
+}
+function drawJoke2(){
+  jokeBase();
+
+  if(joke.uX<310&&joke.uY>-45)
+    put(ASSETS.ufo[1][joke.uF&1],joke.uX,joke.uY,'or');
+
+  if(joke.phase===0)return;
+
+  // Prima dell'impatto: Pac-Man fugge verso destra e il fantasma rosso lo insegue.
+  // Dopo l'impatto: il fantasma diventa grigio e fugge verso sinistra,
+  // mentre Pac-Man si gira e lo insegue.
+  const pacFrame=joke.phase===3
+    ? ((joke.f1%3)+3)%3
+    : 7+((((joke.f1-7)%3)+3)%3);
+  const ghostFrame=joke.phase>=2
+    ? 3+((((joke.f2-3)%2)+2)%2)
+    : 5+((((joke.f2-5)%2)+2)%2);
+
+  if(joke.p1>-30&&joke.p1<310)
+    put(ASSETS.pac[pacFrame],joke.p1,100,'or');
+
+  if(joke.phase!==2&&joke.p2>-30&&joke.p2<310)
+    put(ASSETS.pac[ghostFrame],joke.p2,100,'or');
+
+  if(joke.phase===1&&joke.bombActive)
+    put(ASSETS.enemyShot,joke.bombX,joke.bombY,'or');
+
+  if(joke.phase===2){
+    // L'esplosione è centrata sul fantasma: la causa-effetto della bomba
+    // rimane visibile per quasi un secondo.
+    const ef=Math.min(5,joke.impactFrame);
+    put(ASSETS.explosion[ef],joke.p2-1,94,'or');
+    if(joke.impactTimer>.52)
+      put(ASSETS.pac[ghostFrame],joke.p2,100,'or');
+  }
+
+  if(joke.phase===3&&joke.p2>-30&&joke.p2<310)
+    put(ASSETS.pac[ghostFrame],joke.p2,100,'or');
+}
+function updateJoke2(dt){
+  if(joke.bonusTime>0)joke.bonusTime=Math.max(0,joke.bonusTime-dt);
+  if(hit('Enter')||hit('Space')){finishJoke2();return}
+
+  joke.elapsed=(joke.elapsed||0)+dt;
+
+  if(joke.phase===2){
+    joke.impactTimer+=dt;
+    const f=Math.min(5,Math.floor(joke.impactTimer/.14));
+    if(f!==joke.lastImpactFrame){
+      joke.lastImpactFrame=f;
+      joke.impactFrame=f;
+      beep(150+f*95,.22);
+    }
+    // L'UFO continua ad allontanarsi durante l'esplosione.
+    joke.uX+=dt*11;
+    joke.uY-=dt*4.4;
+    if(joke.impactTimer>=1.0){
+      joke.phase=3;
+      joke.acc=0;
+      joke.f1=0; // Pac-Man rivolto a sinistra
+      joke.f2=3; // fantasma grigio
+    }
+    drawJoke2();
+    return;
+  }
+
+  joke.acc+=dt;
+  const step=joke.phase===0?.1:.055;
+  if(joke.acc<step)return;
+  joke.acc=0;
+  joke.uF^=1;
+
+  if(joke.phase===0){
+    // Come nel BASIC originale, l'UFO sale ma si ferma orizzontalmente a x=200.
+    if(joke.uX<200)joke.uX+=2.5;
+    joke.uY-=.95;
+    if(joke.uY<71.2)joke.phase=1;
+  }else if(joke.phase===1){
+    joke.p1+=2.5;
+    joke.p2+=2.6;
+    joke.f1++; if(joke.f1===10)joke.f1=7;
+    joke.f2++; if(joke.f2===7)joke.f2=5;
+    joke.uX+=.5;
+    joke.uY-=.2;
+
+    if(!joke.bombActive&&joke.uX>248){
+      joke.bombActive=true;
+      joke.bombX=258;
+      joke.bombY=54;
+    }
+    if(joke.bombActive)joke.bombY+=3.8;
+
+    if(joke.bombActive&&joke.bombY>=104){
+      // All'impatto il fantasma viene allineato alla traiettoria della bomba,
+      // così si vede chiaramente che è lui a essere colpito.
+      joke.p2=joke.bombX-8;
+      joke.bombActive=false;
+      joke.phase=2;
+      joke.impactTimer=0;
+      joke.impactFrame=0;
+      joke.lastImpactFrame=-1;
+    }
+  }else{
+    // Inseguimento inverso: il fantasma grigio è davanti,
+    // Pac-Man lo rincorre da destra verso sinistra.
+    joke.p1-=3.75;
+    joke.p2-=3.05;
+    joke.f1=(joke.f1+1)%3;
+    joke.f2=3+((joke.f2-3+1)%2);
+    joke.uX+=.5;
+    joke.uY-=.2;
+
+    if(joke.p1<=joke.p2+13||joke.p1<=5){
+      finishJoke2();
+      return;
+    }
+  }
+
+  if(joke.elapsed>30){finishJoke2();return}
+  drawJoke2();
+}
+function initJoke3(){
+  jokeBase();
+  playBasic(MUS3);
+  Object.assign(joke,{
+    phase:0,phaseTime:0,elapsed:0,animAcc:0,
+    pX:46,pY:147,pF:0,
+    aliens:[
+      {x:18,baseY:148,jump:0},
+      {x:-4,baseY:148,jump:0},
+      {x:-26,baseY:148,jump:0}
+    ],
+    mF:0,
+    uX:335,uY:25,uF:0,
+    beam:0,abduct:0,blue:0,warp:0,
+    soundAcc:0
+  });
+  drawJoke3();
+}
+function finishJoke3(){stopMusic();initNewLevel(3)}
+
+function putTinted(sp,x,y,mode='or'){
+  x=qi(x);y=qi(y);
+  for(let j=0;j<sp.length;j++){
+    const row=sp[j],yy=y+j;
+    if(yy<0||yy>=H)continue;
+    for(let i=0;i<row.length;i++){
+      const xx=x+i;if(xx<0||xx>=W)continue;
+      const c=parseInt(row[i],16)||0;if(!c)continue;
+      // Rimappatura azzurra, conservando luci, ombre e dettagli dello sprite.
+      const nc=c>=14?15:c>=10?11:c>=7?9:c>=4?3:1;
+      const p=yy*W+xx;
+      if(mode==='xor')pixels[p]^=nc;
+      else if(mode==='pset')pixels[p]=nc;
+      else pixels[p]|=nc;
+    }
+  }
+}
+function drawTractorBeam(cx,topY,bottomY,amount,pulse){
+  amount=Math.max(0,Math.min(1,amount));
+  const end=qi(topY+(bottomY-topY)*amount);
+  for(let y=qi(topY);y<=end;y++){
+    const t=(y-topY)/Math.max(1,bottomY-topY);
+    const half=2+qi(t*18);
+    const left=qi(cx-half),right=qi(cx+half);
+    const c=((y+pulse)&3)===0?15:(((y+pulse)&1)?11:3);
+    for(let x=left;x<=right;x++){
+      // Retino trasparente in puro stile VGA: il fascio non copre gli sprite.
+      if(((x+y+pulse)&1)===0||x===left||x===right)plot(x,y,c);
+    }
+  }
+}
+function drawAlienJump(alien,index){
+  let lift=0;
+  if(joke.phase>=2){
+    const wave=Math.max(0,Math.sin(joke.phaseTime*6.3+index*1.65));
+    lift=qi(wave*(13+index*2));
+  }
+  put(ASSETS.alien[3][joke.mF],alien.x,alien.baseY-lift,'or');
+}
+function drawWarpJump(){
+  const p=Math.max(0,Math.min(1,joke.warp));
+  const cx=qi(joke.uX+14),cy=qi(joke.uY+4);
+
+  // Stelle pixel che vengono stirate orizzontalmente durante il salto.
+  const stars=[
+    [20,18],[54,42],[88,25],[118,57],[148,15],[178,49],
+    [214,28],[246,62],[278,20],[302,45],[34,91],[286,99]
+  ];
+  for(let i=0;i<stars.length;i++){
+    const [sx,sy]=stars[i],len=2+qi(p*(8+(i%4)*4));
+    hline(sx-len,sy,sx+len,(i%3===0)?11:((i%3===1)?9:3));
+  }
+
+  if(p<.58){
+    // L'UFO azzurro si comprime e lascia scie energetiche.
+    putTinted(ASSETS.ufo[1][joke.uF],joke.uX,joke.uY,'or');
+    const trail=qi(8+p*65);
+    for(let k=0;k<6;k++){
+      const yy=cy-5+k*2;
+      hline(cx-trail-k*2,yy,cx-15,yy,k%2?9:11,0xCCCC);
+      hline(cx+15,yy,cx+trail+k*2,yy,k%2?3:11,0xCCCC);
+    }
+  }else{
+    // Flash finale: l'astronave scompare in un punto azzurro.
+    const q=(p-.58)/.42;
+    const radius=Math.max(1,qi((1-q)*17));
+    hline(cx-radius,cy,cx+radius,15);
+    line(cx,cy-radius,cx,cy+radius,11);
+    for(let r=2;r<=radius;r+=4){
+      plot(cx-r,cy-r,9);plot(cx+r,cy-r,3);
+      plot(cx-r,cy+r,3);plot(cx+r,cy+r,9);
+    }
+  }
+}
+function drawJoke3(){
+  jokeBase();
+
+  // Terreno e piccole stelle, tutto a pixel interi.
+  rect(0,160,319,164,1);
+  hline(0,159,319,9,0xAAAA);
+  const sky=[[16,24],[42,55],[76,19],[107,72],[139,34],[166,59],[235,18],[273,73],[305,38]];
+  for(let i=0;i<sky.length;i++)plot(sky[i][0],sky[i][1],i%2?9:11);
+
+  if(joke.phase<4){
+    if(joke.phase>=1&&joke.phase<=3){
+      const beamAmount=joke.phase===1?joke.beam:(joke.phase===3?1-joke.beam:1);
+      if(beamAmount>0)drawTractorBeam(joke.uX+14,joke.uY+8,158,beamAmount,qi(joke.elapsed*18));
+    }
+
+    // Tre alieni sempre chiaramente visibili sotto l'omino/UFO.
+    for(let i=0;i<joke.aliens.length;i++)drawAlienJump(joke.aliens[i],i);
+
+    // L'omino scompare solo quando è completamente dentro l'UFO.
+    if(joke.phase<3||joke.pY>joke.uY+6)put(ASSETS.player[joke.pF],joke.pX,joke.pY,'or');
+
+    if(joke.blue)putTinted(ASSETS.ufo[1][joke.uF],joke.uX,joke.uY,'or');
+    else put(ASSETS.ufo[1][joke.uF],joke.uX,joke.uY,'or');
+  }else{
+    // Gli alieni restano sotto e continuano a saltare mentre l'UFO fugge.
+    for(let i=0;i<joke.aliens.length;i++)drawAlienJump(joke.aliens[i],i);
+    drawWarpJump();
+  }
+}
+function updateJoke3(dt){
+  if(hit('Enter')||hit('Space')){finishJoke3();return}
+
+  joke.elapsed+=dt;
+  joke.phaseTime+=dt;
+  joke.animAcc+=dt;
+  joke.soundAcc+=dt;
+
+  if(joke.animAcc>=.10){
+    joke.animAcc=0;
+    joke.pF=(joke.pF+1)%3;
+    joke.mF^=1;
+    joke.uF^=1;
+  }
+
+  if(joke.phase===0){
+    // FUGA: omino davanti, tre alieni chiaramente dietro.
+    joke.pX+=31*dt;
+    for(let i=0;i<3;i++){
+      const target=joke.pX-(27+i*22);
+      joke.aliens[i].x+=Math.min(36*dt,Math.max(0,target-joke.aliens[i].x));
+    }
+
+    // L'UFO entra dall'alto a destra e si posiziona sopra il giocatore.
+    if(joke.elapsed>1.55){
+      joke.uX=Math.max(190,joke.uX-55*dt);
+      joke.uY=Math.min(30,joke.uY+4*dt);
+    }
+
+    if(joke.pX>=198&&joke.uX<=193){
+      joke.pX=198;
+      joke.phase=1;
+      joke.phaseTime=0;
+      beep(900,.8);
+    }
+  }else if(joke.phase===1){
+    // Il fascio scende fino a terra; gli inseguitori si raccolgono sotto.
+    joke.beam=Math.min(1,joke.phaseTime/1.15);
+    const targets=[170,196,222];
+    for(let i=0;i<3;i++){
+      const d=targets[i]-joke.aliens[i].x;
+      joke.aliens[i].x+=Math.sign(d)*Math.min(Math.abs(d),28*dt);
+    }
+    joke.pX+=(joke.uX+10-joke.pX)*Math.min(1,dt*3.5);
+
+    if(joke.phaseTime>=1.3){
+      // Posizioni definitive e separate sotto il fascio:
+      // i tre alieni devono essere sempre riconoscibili durante i salti.
+      joke.aliens[0].x=170;
+      joke.aliens[1].x=196;
+      joke.aliens[2].x=222;
+      joke.phase=2;
+      joke.phaseTime=0;
+      beep(1450,1.4);
+    }
+  }else if(joke.phase===2){
+    // RAPIMENTO: l'omino sale nel fascio; i tre alieni saltano senza raggiungerlo.
+    joke.pX+=(joke.uX+10-joke.pX)*Math.min(1,dt*5);
+    joke.pY=Math.max(joke.uY+4,joke.pY-44*dt);
+
+    if(joke.soundAcc>.28){
+      joke.soundAcc=0;
+      beep(520+joke.pY*4,.22);
+    }
+
+    if(joke.pY<=joke.uY+5){
+      joke.phase=3;
+      joke.phaseTime=0;
+      joke.blue=1;
+      joke.beam=1;
+      beep(1900,1.5);
+    }
+  }else if(joke.phase===3){
+    // Il fascio si richiude mentre l'UFO diventa azzurro.
+    joke.beam=Math.max(0,1-joke.phaseTime/.85);
+    if(joke.phaseTime>=1.05){
+      joke.phase=4;
+      joke.phaseTime=0;
+      joke.warp=0;
+      stopMusic();
+      beep(2400,2.5);
+    }
+  }else{
+    // SALTO INTERSTELLARE: compressione, scie azzurre e sparizione.
+    joke.warp=Math.min(1,joke.phaseTime/1.35);
+    if(joke.soundAcc>.08){
+      joke.soundAcc=0;
+      beep(700+2600*joke.warp,.18,0,.025);
+    }
+    if(joke.phaseTime>=1.55){
+      finishJoke3();
+      return;
+    }
+  }
+
+  drawJoke3();
+}
+
+// Le vecchie funzioni di esplosione restano come compatibilità,
+// ma non vengono più usate dal nuovo intermezzo 3.
+function beginJokeRocketBoom(){finishJoke3()}
+function updateJoke3Boom(dt){finishJoke3()}
+function initNewLevel(n){stopMusic();Object.assign(joke,{levelText:n,phase:0,acc:0,row:2,time:0});switchMode('newlevel');cls()}
+function finishNewLevel(){setupLevel()}
+function updateNewLevel(dt){if(hit('Enter')||hit('Space'))joke.time=99;joke.time+=dt;joke.acc+=dt;if(joke.phase===0&&joke.acc>=.14){joke.acc=0;rect(0,145,319,150,0);rect(0,150,319,160,2);hline(0,154,319,15,0xF0F0);printCell(Math.max(1,joke.row-1),8,'You have reached LEVEL '+joke.levelText+'!',0);printCell(joke.row,8,'You have reached LEVEL '+joke.levelText+'!',joke.row);joke.row++;if(joke.row>11)joke.phase=1}else if(joke.phase===1){const c=55+Math.floor(joke.time*12)%36;printCell(11,8,'You have reached LEVEL '+joke.levelText+'!',c);beep(200+joke.time*120,.09);if(joke.time>3.5){finishNewLevel()}}}
+function finishGame(invasion){stopMusic();g.invasion=invasion;switchMode('gameover',()=>{gameOver.time=0;printCell(10,10,'GAME OVER!',14)})}
+const gameOver={};function updateGameOver(dt){gameOver.time+=dt;if(gameOver.time>2||hit('Enter')||hit('Space')){const qualifies=g.score>scores[scores.length-1].score;if(qualifies){nameState.value='';switchMode('name',drawNameScreen)}else switchMode('topten',initTopTen)}}
+const nameState={value:''};function drawNameScreen(){cls();printCell(4,11,'YOU ARE QUALIFIED!',14);printCell(6,6,'Please, enter your name',15);printCell(8,8,nameState.value.padEnd(18,'_'),14);printCell(12,5,'ENTER confirms · BACKSPACE deletes',7)}
+function nameKey(e){if(app.mode!=='name')return;if(e.code==='Enter'){const name=(nameState.value.trim()||'PLAYER').slice(0,18).padEnd(18);scores.push({name,score:g.score});scores.sort((a,b)=>b.score-a.score);scores=scores.slice(0,10);saveScores();switchMode('topten',initTopTen);return}if(e.code==='Backspace'){nameState.value=nameState.value.slice(0,-1);drawNameScreen();return}if(e.key.length===1&&nameState.value.length<18&&/[A-Za-zÀ-ÿ0-9 .,'+*?!()\[\]_-]/.test(e.key)){nameState.value+=e.key;drawNameScreen()}else beep(3000,.5)}
+function updateName(){if(hit('Escape'))switchMode('topten',initTopTen)}
+function main(now){const dt=Math.min(.05,(now-(main.last||now))/1000);main.last=now;app.time+=dt;switch(app.mode){case'presentation':updatePresentation(dt);break;case'topten':updateTopTen(dt);break;case'game':updateGame(dt);break;case'pause':updatePause(dt);break;case'joke1':updateJoke1(dt);break;case'joke2':updateJoke2(dt);break;case'joke3':updateJoke3(dt);break;case'joke3boom':updateJoke3Boom(dt);break;case'joke4':updateNewLevel(dt);break;case'newlevel':updateNewLevel(dt);break;case'gameover':updateGameOver(dt);break;case'name':updateName(dt);break}render();pressed.clear();requestAnimationFrame(main)}
+window.__aldusDebug={ASSETS,pixels,app,g,startNewGame,setupLevel,switchMode,initPresentation,initJoke1,initJoke2,initJoke3};
+initPresentation();requestAnimationFrame(main);
+</script>
+</body>
+</html>
